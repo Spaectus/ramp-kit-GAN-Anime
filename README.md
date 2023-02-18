@@ -1,7 +1,7 @@
 # RAMP starting kit on GAN Anime
 
 
-_Authors: MAI Huu Tan, CARON Marceau, SALOMON Yohann, LIU Annie, BERTHOLOM François & BIGOT Alexandre
+> Authors: MAI Huu Tan, CARON Marceau, SALOMON Yohann, LIU Annie, BERTHOLOM François & BIGOT Alexandre
 
 
 #### Set up
@@ -33,6 +33,16 @@ Go to the `ramp-workflow` [wiki](https://github.com/paris-saclay-cds/ramp-workfl
 
 ---
 
+## TODO
 
+### [`problem.py` file](https://paris-saclay-cds.github.io/ramp-docs/ramp-workflow/stable/problem.html#problem)
 
+- Implem custom [Prediction type](https://github.com/paris-saclay-cds/ramp-workflow/tree/master/rampwf/prediction_types)
+- Implem the [workflow](https://github.com/paris-saclay-cds/ramp-workflow/tree/master/rampwf/workflows)
+- Implem score metrics
+- specify cross-validation ?
+- get_train_data() and get_test_data() ?
 
+### build submissions/starting_kit
+
+- implem simple auto-encoder
