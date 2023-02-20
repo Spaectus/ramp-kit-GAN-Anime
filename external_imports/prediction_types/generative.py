@@ -7,6 +7,9 @@ y_pred can be one or two-dimensional (for multi-target regression)
 import numpy as np
 from rampwf.prediction_types.base import BasePrediction
 
+N_GEN = 100 # TODO bad pratice here
+
+
 class BaseImgGen(BasePrediction):
     def valid_indexes(self):
         if len(self.y_pred.shape) <= 3:
@@ -16,10 +19,14 @@ class BaseImgGen(BasePrediction):
             return ~np.isnan(self.y_pred).any(axis=1)
         else:
             raise ValueError('y_pred.shape > 4 is not implemented')
-        
+
     def check_y_pred_dimensions(self):
-        # TODO: Implement this for images.
-        pass
+        assert self.channels is not None
+        assert self.height is not None
+        assert self.width is not None
+        expected_y_pred_shape = (N_GEN, self.channels, self.channels, self.height)
+        if self.y_pred.shape != expected_y_pred_shape:
+            raise ValueError(f"Wrong y_pred dimensions. Found y_pred.shape={self.y_pred.shape}, expect {expected_y_pred_shape}")
 
 
 def _generation_init(self, y_pred=None, y_true=None, n_samples=None,
@@ -63,7 +70,7 @@ def _generation_init(self, y_pred=None, y_true=None, n_samples=None,
     self.check_y_pred_dimensions()
 
 def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
-                     fold_is=None):
+                     fold_is=None, channels=None, height=None, width=None):
     """Initialize a generation prediction type.
     The input is either y_pred, or y_true, or n_samples.
     Parameters
@@ -97,6 +104,10 @@ def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
     else:
         raise ValueError(
             'Missing init argument: y_pred, y_true, or n_samples')
+    self.channels = channels
+    self.height = height
+    self.width = width
+    print(f"{self.channels=}")
     self.check_y_pred_dimensions()
 
 
@@ -119,12 +130,12 @@ def make_generative(label_names=[]):
          })
     return Predictions
 
-def make_generative_img(height, width, label_names=[]):
+def make_generative_img(channels, height, width, label_names=[]):
     Predictions = type(
         'Regression',
         (BaseImgGen,),
         {'label_names': label_names,
-         'channels': 3,
+         'channels': channels,
          'height': height,
          'width': width,
          '__init__': _generation_img_init,
