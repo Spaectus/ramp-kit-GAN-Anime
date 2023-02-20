@@ -104,3 +104,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# Models created in the notebook
+models/
