@@ -7,8 +7,6 @@ y_pred can be one or two-dimensional (for multi-target regression)
 import numpy as np
 from rampwf.prediction_types.base import BasePrediction
 
-N_GEN = 100 # TODO bad pratice here
-
 
 class BaseImgGen(BasePrediction):
     def valid_indexes(self):
@@ -24,8 +22,9 @@ class BaseImgGen(BasePrediction):
         assert self.channels is not None
         assert self.height is not None
         assert self.width is not None
-        expected_y_pred_shape = (N_GEN, self.channels, self.channels, self.height)
-        if self.y_pred.shape != expected_y_pred_shape:
+        # We do not know the expected size on the first dimension
+        expected_y_pred_shape = (-1, self.channels, self.width, self.height)
+        if self.y_pred.shape[1:] != expected_y_pred_shape[1:]:
             raise ValueError(f"Wrong y_pred dimensions. Found y_pred.shape={self.y_pred.shape}, expect {expected_y_pred_shape}")
 
 
@@ -104,10 +103,6 @@ def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
     else:
         raise ValueError(
             'Missing init argument: y_pred, y_true, or n_samples')
-    self.channels = channels
-    self.height = height
-    self.width = width
-    print(f"{self.channels=}")
     self.check_y_pred_dimensions()
 
 
@@ -130,12 +125,11 @@ def make_generative(label_names=[]):
          })
     return Predictions
 
-def make_generative_img(channels, height, width, label_names=[]):
+def make_generative_img(channels, height, width):
     Predictions = type(
         'Regression',
         (BaseImgGen,),
-        {'label_names': label_names,
-         'channels': channels,
+        {'channels': channels,
          'height': height,
          'width': width,
          '__init__': _generation_img_init,

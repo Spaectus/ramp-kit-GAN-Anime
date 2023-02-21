@@ -8,20 +8,25 @@ import numpy as np
 
 import rampwf as rw
 from rampwf.score_types.base import BaseScoreType
+
+from sklearn.model_selection import StratifiedShuffleSplit
 from torchmetrics.image.fid import FrechetInceptionDistance
 from torchmetrics.image.kid import KernelInceptionDistance
+from torch import from_numpy
 
 from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
 
-problem_title = "GAN Anime"
+from prediction_types.generative import make_generative_img
 
+problem_title = "GAN Anime"
 
 # -----------------------------------------------------------------------------
 # Worklow element
 # -----------------------------------------------------------------------------
 
-workflow = ImageGenerative()
+# n_images_generated : the number of images that we ask the ramp competitor to generate per fold
+workflow = ImageGenerative(n_images_generated=100, latent_space_dimension=1024)
 
 # -----------------------------------------------------------------------------
 # Predictions type
@@ -31,11 +36,16 @@ height = 64
 channels = 3
 p = channels * height * width
 
-BaseGenerative = make_generative_img(
-    height=height, width=width, label_names=np.arange(p), channels=channels
+Predictions = make_generative_img(
+    height=height, width=width, channels=channels
 )
 
-# TODO: Redefine Predictions to fit the challenge.
+# Will be executed line 232 by https://github.com/paris-saclay-cds/ramp-workflow/blob/master/rampwf/utils/submission.py the folowing code :
+"""
+predictions_train_train = problem.Predictions(
+        y_pred=y_pred_train, fold_is=train_is)
+"""
+
 
 # -----------------------------------------------------------------------------
 # Score types
@@ -54,6 +64,7 @@ class FID(BaseScoreType):
         score = self.fid.compute()
         return score
 
+
 # Kernel Inception Distance (KID)
 
 # TODO: see if we can combine both into one type of score because computing the core twice
@@ -71,6 +82,7 @@ class KIDMean(BaseScoreType):
         score = self.kid.compute()
         return score[0]
 
+
 class KIDStd(BaseScoreType):
     def __init__(self, name='fid_var'):
         self.kid = KernelInceptionDistance(reset_real_features=True)
@@ -78,8 +90,10 @@ class KIDStd(BaseScoreType):
 
     def __call__(self, y_true, y_pred):
         # y_true = X ; y_pred = X_gen = G(z)
-        self.kid.update(y_true, real=True)
-        self.kid.update(y_pred, real=False)
+        pt_y_true = from_numpy(y_true)
+        print(f"{pt_y_true.dtype=}")  # torch.Tensor with dtype == torch.float64
+        self.kid.update(pt_y_true, real=True)  # ValueError: Expecting image as torch.Tensor with dtype=torch.uint8
+        self.kid.update(y_pred, real=False)  # ValueError: Expecting image as torch.Tensor with dtype=torch.uint8
         score = self.kid.compute()
         return score[1]
 
@@ -92,42 +106,79 @@ score_types = [
     KIDStd()
 ]
 
+
+# ----------------------------------------------------------------------------
+# Cross-validation scheme
+# ----------------------------------------------------------------------------
+
+
+def get_cv(X, y):
+    """
+    Specify a cross-validation scheme Specify a way to split the ‘train’ data into training and validation sets.
+    This should be done by defining a get_cv() function that takes the feature and target data as parameters and returns
+    indices that can be used to split the data. If you are using a function with a random element, e.g.,
+    StratifiedShuffleSplit() from scikit-learn, it is important to set the random seed. This ensures that the train and
+    valuidation data will be the same for all participants.
+
+    :param X:
+    :param y:
+    :return:
+    """
+    size = len(y)  # == number of images normally
+    # print(f"Pour get_cv, {len(y)=}, we choose {size=}")
+    n_fold = 3
+    # We will divided the dataset in n_fold equal set of images
+    support = np.linspace(0, n_fold, endpoint=False, num=size, dtype=int)
+    arange = np.arange(size)
+    for i in range(n_fold):
+        vec_bool = (support == i)  # vector of bool
+        # we convert vector of bool to vector of indices for train_is and valid_is
+        train_is = arange[vec_bool]
+        valid_is = arange[vec_bool]  # train data and valid data are same in our case
+        yield train_is, valid_is
+
+
 # -----------------------------------------------------------------------------
 # Training / testing data reader
 # -----------------------------------------------------------------------------
 
 
-def _read_data(path, str_:str):
+def _read_data(path, str_: str):
     assert Path("data/images").exists(), f"Please download the data with `python download_data.py`"
     paths = tuple(Path("data/images").glob("*.jpg"))
     n_images = len(paths)
     assert n_images, f"No jpg images found in data/images"
     if 1:
         import torchvision
-        assert width == height, f"This part of code can handle only square image"
+        assert width == height, f"This part of the code can handle only square images"
         dataset = torchvision.datasets.ImageFolder(root="data",
-                               transform=torchvision.transforms.Compose([
-                                   torchvision.transforms.Resize(width),
-                                   torchvision.transforms.CenterCrop(width),
-                                   torchvision.transforms.ToTensor(),
-                                   torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                               ]))
+                                                   transform=torchvision.transforms.Compose([
+                                                       torchvision.transforms.Resize(width),
+                                                       torchvision.transforms.CenterCrop(width),
+                                                       torchvision.transforms.ToTensor(),
+                                                       torchvision.transforms.Normalize((0.5, 0.5, 0.5),
+                                                                                        (0.5, 0.5, 0.5)),
+                                                   ]))
     else:
         dataset = tuple(zip([np.empty((channels, width, height))], range(1)))
 
     test = os.getenv("RAMP_TEST_MODE", 0)
     # for the "quick-test" mode, use less data
     if test:
-        n_images = 1_000
-    print(f"{n_images * 3 * width * height=}")
+        n_images = 100  # TODO
+    # print(f"{n_images * 3 * width * height=}")
     result = np.empty((n_images, channels, width, height))
     # we extract the n_images first image of the torchvision.datasets.ImageFolder
     for i, (tensor_, _) in itertools.islice(enumerate(dataset), n_images):
         result[i] = tensor_
-    return result
+
+    # we do not use y, so we set it as a empty vector BUT with correct shape !
+    return result, np.empty_like(result)
+
 
 def get_train_data(path="."):
     return _read_data(path, "train")
+
 
 def get_test_data(path="."):
     return _read_data(path, "test")
