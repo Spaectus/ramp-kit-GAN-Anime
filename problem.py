@@ -3,6 +3,10 @@ from pathlib import Path
 import itertools
 import getpass
 
+import torch
+from torch.utils.data import DataLoader, Dataset
+from torchvision.transforms import Compose, CenterCrop, Resize, ToTensor, Normalize
+
 import pandas as pd
 import numpy as np
 
@@ -40,6 +44,8 @@ Predictions = make_generative_img(
     height=height, width=width, channels=channels
 )
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 # Will be executed line 232 by https://github.com/paris-saclay-cds/ramp-workflow/blob/master/rampwf/utils/submission.py the folowing code :
 """
 predictions_train_train = problem.Predictions(
@@ -58,8 +64,8 @@ class FID(BaseScoreType):
         self.name = name
 
     def __call__(self, y_true, y_pred):
-        # y_true = X ; y_pred = X_gen = G(z)
-        self.fid.update(y_true, real=True)
+        for batch in y_true:
+            self.fid.update(y_true, real=True)
         self.fid.update(y_pred, real=False)
         score = self.fid.compute()
         return score
@@ -70,40 +76,29 @@ class FID(BaseScoreType):
 # TODO: see if we can combine both into one type of score because computing the core twice
 # is expensive.
 
-class KIDMean(BaseScoreType):
+class KID(BaseScoreType):
     def __init__(self, name='kid_mean'):
         self.kid = KernelInceptionDistance(reset_real_features=True)
         self.name = name
 
     def __call__(self, y_true, y_pred):
         # y_true = X ; y_pred = X_gen = G(z)
-        self.kid.update(y_true, real=True)
-        self.kid.update(y_pred, real=False)
+        for batch in y_true:
+            batch_ = torch.tensor(batch_).to(device)
+            self.kid.update(batch_, real=True)
+        for batch in y_pred:
+            batch_ = torch.tensor(batch).to(device)
+            self.kid.update(batch_, real=False)
         score = self.kid.compute()
+        # score = (mean, std)
         return score[0]
-
-
-class KIDStd(BaseScoreType):
-    def __init__(self, name='fid_var'):
-        self.kid = KernelInceptionDistance(reset_real_features=True)
-        self.name = name
-
-    def __call__(self, y_true, y_pred):
-        # y_true = X ; y_pred = X_gen = G(z)
-        pt_y_true = from_numpy(y_true)
-        print(f"{pt_y_true.dtype=}")  # torch.Tensor with dtype == torch.float64
-        self.kid.update(pt_y_true, real=True)  # ValueError: Expecting image as torch.Tensor with dtype=torch.uint8
-        self.kid.update(y_pred, real=False)  # ValueError: Expecting image as torch.Tensor with dtype=torch.uint8
-        score = self.kid.compute()
-        return score[1]
-
 
 # Inception Score
 
 score_types = [
     # Fréchet Inception Distance
     FID(),
-    KIDStd()
+    # KID()
 ]
 
 

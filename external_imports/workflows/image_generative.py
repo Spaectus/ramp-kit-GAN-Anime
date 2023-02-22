@@ -59,6 +59,14 @@ class ImageGenerative():
         generator = trained_model # we retieve the model trained by the train_submission
         # Gaussian noise is generated for the latent space.
         latent_space_noise = np.random.normal(size=(self.n_images_generated, self.latent_space_dimension))
-        res_numpy_matrix = generator.generate(latent_space_noise)
 
-        return res_numpy_matrix
+        batch_size = 64
+
+        for i in range(0, self.n_images_generated, batch_size):
+            upper = min(i + batch_size, self.n_images_generated)
+            batch = latent_space_noise[i:upper]
+            res_numpy = generator.generate(batch)
+
+            yield res_numpy
+
+
