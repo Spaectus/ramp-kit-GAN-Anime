@@ -26,7 +26,7 @@ problem_title = "GAN Anime"
 # -----------------------------------------------------------------------------
 
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
-workflow = ImageGenerative(n_images_generated=10, latent_space_dimension=1024, y_pred_batch_size=64,
+workflow = ImageGenerative(n_images_generated=10, latent_space_dimension=1024, y_pred_batch_size=32,
                            chunk_size_feeder=64,
                            seed=23)
 
@@ -134,4 +134,4 @@ def get_train_data(path="."):
 
 
 def get_test_data(path="."):
-    return _read_data(path, "test")
+    return tuple(), tuple() #_read_data(path, "test")

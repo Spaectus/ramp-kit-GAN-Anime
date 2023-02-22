@@ -31,9 +31,10 @@ class BaseImgGen(BasePrediction):
 
     def set_valid_in_train(self, predictions, test_is):
         """Set a cross-validation slice."""
+        # This function is called for "Bagged scores"
         # No test data for our use case
         # print(f"in set_valid_in_train {test_is=}\n{type(predictions.y_pred)=}") # TODO
-
+        #print(f"ICI {type(predictions)=}")
         self.y_pred = predictions.y_pred  # TODO
         # self.y_pred[test_is] = predictions.y_pred
 
@@ -41,6 +42,8 @@ class BaseImgGen(BasePrediction):
         """Collapsing y_pred to a cross-validation slice.
         So scores do not need to deal with masks.
         """
+        #This function is called for "Bagged scores"
+        #print(f"Set_slice {valid_indexes=}")
         pass  # TODO
         # self.y_pred = self.y_pred[valid_indexes]
 
@@ -67,6 +70,7 @@ class BaseImgGen(BasePrediction):
         combined_predictions : instance of cls
             A predictions instance containing the combined predictions.
         """
+        # print(f"combine {index_list=}")
         if index_list is None:  # we combine the full list
             index_list = range(len(predictions_list))
         y_comb_list = np.array(
@@ -141,6 +145,15 @@ def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
         either the training indices, validation indices, or None when we
         use the (full) test data.
     """
+    assert y_pred is not None or y_true is not None or n_samples is not None
+    assert isinstance(y_true, (tuple, type(None))), f"{type(y_true)=}"
+    if isinstance(y_true, tuple):
+        # hence y_true is tuple of path
+        if fold_is is not None:
+            # fold_is == list d'indices
+            #print(f"{fold_is[:10]=}")
+            pass
+        # print(f"{len(y_true)}")
     if 0:
         print(f"{type(y_pred)=}")
         print(f"{type(y_true)=}")

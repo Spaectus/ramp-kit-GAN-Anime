@@ -30,6 +30,7 @@ class ImageGenerative():
         self.y_pred_batch_size = y_pred_batch_size
         self.chunk_size_feeder: int = chunk_size_feeder
         self.seed = seed
+        self.rng = np.random.default_rng(seed=self.seed)
 
     def train_submission(self, module_path, X_array, y_array, train_is=None):
         """Train a batch image classifier.
@@ -38,7 +39,6 @@ class ImageGenerative():
             have to contain generator.py.
         X_array : ArrayContainer vector of int
 
-             only image IDs).
         y_array : vector of int
 
         train_is : vector of int
@@ -79,12 +79,15 @@ class ImageGenerative():
         :param X_array: object that is returned by get_test_data in problem.py
         :return: generated images from generator
         """
-        # print(f"{X_array.shape=}")
+        assert isinstance(X_array, tuple)
+
+        # print(f"test_submission {X_array[:10]=}")
+
+
         generator = trained_model  # we retieve the model trained by the train_submission
 
         # Gaussian noise is generated for the latent space.
-        rng = np.random.default_rng(seed=self.seed)
-        latent_space_noise = rng.normal(size=(self.n_images_generated, self.latent_space_dimension))
+        latent_space_noise = self.rng.normal(size=(self.n_images_generated, self.latent_space_dimension))
 
         # return KnownLengthGenerator(generator.generate(latent_space_noise), self.n_images_generated)
 
@@ -106,7 +109,7 @@ class ImageGenerative():
                         f"Output of the generate function must be a np.ndarray without nan, {np.isnan(res_numpy).sum()} nan found")
                 if np.isinf(res_numpy).any():
                     raise ValueError(
-                        f"Output of the generate function must be a np.ndarray without inf, {np.isinf(res_numpy).sum()} nan found")
+                        f"Output of the generate function must be a np.ndarray without inf, {np.isinf(res_numpy).sum()} inf found")
 
                 yield res_numpy
 
@@ -266,6 +269,7 @@ class KnownLengthGenerator:
         from itertools import tee
         original, new = tee(self.gen, 2)
         yield from new
+        #yield from self.gen
 
     def __next__(self):
         print(f"Destruction of a generator !!")
