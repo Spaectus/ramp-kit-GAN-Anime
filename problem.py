@@ -180,8 +180,9 @@ def _read_data(path, str_: str):
         n_images = 100  # TODO
 
     res = tuple()
-    for i in range(2):
-        res += tuple(Path(f"data/train{i}").glob("*.jpg"))
+    train_folders = tuple(Path("data").glob("train_*"))
+    for train_folder in train_folders:
+        res += tuple(train_folder.glob("*.jpg"))
     if test:
         return res[:100], res[:100]
     return res, res
