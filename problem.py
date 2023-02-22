@@ -84,10 +84,10 @@ class KID(BaseScoreType):
     def __call__(self, y_true, y_pred):
         # y_true = X ; y_pred = X_gen = G(z)
         for batch in y_true:
-            batch_ = torch.tensor(batch_).to(device)
+            batch_ = torch.Tensor(batch_).to(device)
             self.kid.update(batch_, real=True)
         for batch in y_pred:
-            batch_ = torch.tensor(batch).to(device)
+            batch_ = torch.Tensor(batch).to(device)
             self.kid.update(batch_, real=False)
         score = self.kid.compute()
         # score = (mean, std)
