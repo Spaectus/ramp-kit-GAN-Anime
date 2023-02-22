@@ -52,6 +52,43 @@ predictions_train_train = problem.Predictions(
         y_pred=y_pred_train, fold_is=train_is)
 """
 
+import torch
+from torch import nn
+from torch import optim
+from torch.utils.data import DataLoader, Dataset
+from torchvision.transforms import Compose, CenterCrop, Resize, ToTensor, Normalize
+import torchvision.utils as vutils
+import matplotlib.pyplot as plt
+from PIL import Image
+from tqdm import tqdm
+import os
+
+transform = Compose([
+    ToTensor(),
+])
+
+class ImageSet(Dataset):
+    def __init__(self, paths, transform, preload=False):
+        self.paths = paths
+        self.transform = transform
+        self.preload = preload
+        if self.preload:
+          self.files = [
+              self.transform(
+                  Image.open(path)
+              ) for path in self.paths]
+
+    def __getitem__(self, index):
+        if self.preload:
+          return self.files[index]
+        else:
+          return self.transform(
+              Image.open(self.paths[index])
+          )
+    
+    def __len__(self):
+        return len(self.paths)
+
 
 # -----------------------------------------------------------------------------
 # Score types
@@ -62,8 +99,9 @@ class FID(BaseScoreType):
     precision = 2
 
     def __init__(self, name='fid_score'):
-        self.fid = FrechetInceptionDistance(reset_real_features=True).to(device)
+        self.fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
         self.name = name
+        self.batch_size = 32
 
     def check_y_pred_dimensions(self, y_true, y_pred):
         pass
@@ -71,14 +109,40 @@ class FID(BaseScoreType):
     def __call__(self, y_true, y_pred):
         assert isinstance(y_true, tuple)
         # y_pred is generator with len
-        return 1.
 
-        for batch in y_true:
-            batch_ = torch.Tensor(batch).to(device)
+        # Handling true data
+        dataset = ImageSet(
+            paths=y_true,
+            transform=transform,
+            preload=True,
+        )
+        loader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
+        for batch in loader:
+            batch_ = batch.to(device)
             self.fid.update(batch_, real=True)
-        for batch in y_pred:
+
+        # Handling generated data
+        batch = []
+        for data in y_pred:
+            print(type(data))
+            print(next(data).size())
+            print(y_pred)
+            # print([data_ for data_ in data])
+            batch.append(data)
+            if len(batch) >= self.batch_size:
+                batch_ = torch.Tensor(batch).to(device)
+                self.fid.update(batch_, real=False)
+                batch = []
+        ## Last batch
+        if len(batch) > 0:
             batch_ = torch.Tensor(batch).to(device)
             self.fid.update(batch_, real=False)
+        
+        # Compute score
         score = self.fid.compute()
         return score
 
@@ -180,8 +244,8 @@ def _read_data(path, str_: str):
         n_images = 100  # TODO
 
     res = tuple()
-    for i in range(2):
-        res += tuple(Path(f"data/train{i}").glob("*.jpg"))
+    for i in range(1, 4):
+        res += tuple(Path(f"data/train_{i}").glob("*.jpg"))
     if test:
         return res[:100], res[:100]
     return res, res
