@@ -14,7 +14,8 @@ class ImageGenerative():
     """
 
     def __init__(self, workflow_element_names=['generator'], n_images_generated: int = 100,
-                 latent_space_dimension: int = 1024):
+                 latent_space_dimension: int = 1024, y_pred_batch_size: int = 64, chunk_size_feeder: int = 128,
+                 seed: int = 23):
         """
 
         :param n_images_generated: umber of images generated to evaluate a generator
@@ -24,6 +25,9 @@ class ImageGenerative():
         self.n_images_generated: int = n_images_generated
         self.latent_space_dimension: int = latent_space_dimension
         self.elements_names = workflow_element_names
+        self.y_pred_batch_size = y_pred_batch_size
+        self.chunk_size_feeder: int = chunk_size_feeder
+        self.seed = seed
 
     def train_submission(self, module_path, X_df, y_array, train_is=None):
         """Train a batch image classifier.
@@ -57,7 +61,7 @@ class ImageGenerative():
 
         images_names = [str(path.absolute()) for path in (Path("data") / folder).glob("*.jpg")]
 
-        g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=2, n_jobs=-1)
+        g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder, n_jobs=-1)
 
         generator.fit(g)
         return generator
@@ -71,18 +75,32 @@ class ImageGenerative():
         """
         # print(f"{X_array.shape=}")
         generator = trained_model  # we retieve the model trained by the train_submission
+
         # Gaussian noise is generated for the latent space.
-        latent_space_noise = np.random.normal(size=(self.n_images_generated, self.latent_space_dimension))
+        rng = np.random.default_rng(seed=self.seed)
+        latent_space_noise = rng.normal(size=(self.n_images_generated, self.latent_space_dimension))
 
-        #return KnownLengthGenerator(generator.generate(latent_space_noise), self.n_images_generated)
-
-        batch_size = 64
+        # return KnownLengthGenerator(generator.generate(latent_space_noise), self.n_images_generated)
 
         def gen():
-            for i in range(0, self.n_images_generated, batch_size):
-                upper = min(i + batch_size, self.n_images_generated)
+            for i in range(0, self.n_images_generated, self.y_pred_batch_size):
+                upper = min(i + self.y_pred_batch_size, self.n_images_generated)
                 batch = latent_space_noise[i:upper]
                 res_numpy = generator.generate(batch)
+                if not isinstance(res_numpy, np.ndarray):
+                    raise ValueError(f"Output of generate function must be a np.ndarray, {type(res_numpy)} found")
+                if len(res_numpy.shape) != 4:
+                    raise ValueError(
+                        f"Output of the generate function must be a np.ndarray with exactly {4} dimensions, {len(res_numpy.shape)} found")
+                if res_numpy.shape[0] != len(batch):
+                    raise ValueError(
+                        f"The first dimension of the np.array returned by the generate function must be {len(batch)} in this case, found {res_numpy.shape[0]}")
+                if np.isnan(res_numpy).any():
+                    raise ValueError(f"Output of the generate function must be a np.ndarray without nan, {np.isnan(res_numpy).sum()} nan found")
+                if np.isinf(res_numpy).any():
+                    raise ValueError(
+                        f"Output of the generate function must be a np.ndarray without inf, {np.isinf(res_numpy).sum()} nan found")
+
                 yield res_numpy
 
         return KnownLengthGenerator(gen(), self.n_images_generated)
@@ -180,7 +198,6 @@ class BatchGeneratorBuilderNoValidNy():
                 # W
                 X = np.array(X)
 
-
                 # 2) Yielding mini-batches
                 for i in range(0, len(X), batch_size):
                     yield X[i:i + batch_size]
@@ -239,7 +256,10 @@ class KnownLengthGenerator:
         return self.length
 
     def __iter__(self):
-        yield from self.gen
+        from itertools import tee
+        original, new = tee(self.gen, 2)
+        yield from new
 
     def __next__(self):
+        print(f"Destruction of a generator !!")
         return next(self.gen)

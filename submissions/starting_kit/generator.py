@@ -1,5 +1,5 @@
 import torchvision
-
+import numpy as np
 
 class Generator():
     """
@@ -15,6 +15,7 @@ class Generator():
         generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(batch_size=100)
         self.memory = next(generator_of_images)  # grab the first mini-batch of images.
         # self.memory = images_matrix[: 100]  # we memorise 100 images of the train dataset
+        assert isinstance(self.memory, np.ndarray)
 
     def generate(self, latent_space_noise):
         """
@@ -25,12 +26,14 @@ class Generator():
         :return: matrix of size (nb_image, 3, 64, 64)
         """
         nb_image = latent_space_noise.shape[0]
-
+        print("Startink kit generator")
         assert len(
             self.memory) >= nb_image, f"We do not saved enough images ! We saved {len(self.memory)} but we need {nb_image}"
 
+        assert isinstance(self.memory, np.ndarray)
+
         return self.memory[:nb_image]
 
-        for i in range(nb_image):
-            assert self.memory[i].shape == (3, 64, 64), f"{self.memory[i].shape=}"
-            yield self.memory[i]
+        #for i in range(nb_image):
+        #    assert self.memory[i].shape == (3, 64, 64), f"{self.memory[i].shape=}"
+        #    yield self.memory[i]
