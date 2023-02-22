@@ -11,8 +11,10 @@ class Generator():
         self.latent_space_dimension: int = latent_space_dimension
 
     # def fit(self, image_folder: torchvision.datasets.ImageFolder):
-    def fit(self, images_matrix):
-        self.memory = images_matrix[: 100]  # we memorise 100 images of the train dataset
+    def fit(self, batchGeneratorBuilderNoValidNy):
+        generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(batch_size=100)
+        self.memory = next(generator_of_images)  # grab the first mini-batch of images.
+        # self.memory = images_matrix[: 100]  # we memorise 100 images of the train dataset
 
     def generate(self, latent_space_noise):
         """
@@ -26,6 +28,6 @@ class Generator():
 
         assert len(
             self.memory) >= nb_image, f"We do not saved enough images ! We saved {len(self.memory)} but we need {nb_image}"
-        # We don't care of latent_space_noise, we just return the memorised images
-        y_pred = self.memory[: nb_image]
-        return y_pred
+
+        for i in range(nb_image):
+            yield self.memory[i]

@@ -156,7 +156,7 @@ def _read_data(path, str_: str):
                                                        torchvision.transforms.ToTensor(),
                                                        torchvision.transforms.Normalize((0.5, 0.5, 0.5),
                                                                                         (0.5, 0.5, 0.5)),
-                                                   ]))
+                                                      ]))
     else:
         dataset = tuple(zip([np.empty((channels, width, height))], range(1)))
 
@@ -164,6 +164,14 @@ def _read_data(path, str_: str):
     # for the "quick-test" mode, use less data
     if test:
         n_images = 100  # TODO
+
+    res = []
+    for i in range(2):
+        res.extend(tuple(Path(f"data/tain{i}").glob("*.jpg")))
+    if test:
+        return res[:100], res[:100]
+    return res, res
+
     # print(f"{n_images * 3 * width * height=}")
     result = np.empty((n_images, channels, width, height))
     # we extract the n_images first image of the torchvision.datasets.ImageFolder

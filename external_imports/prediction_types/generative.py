@@ -22,6 +22,7 @@ class BaseImgGen(BasePrediction):
         assert self.channels is not None
         assert self.height is not None
         assert self.width is not None
+        return None # TODO how to check a generator ?
         # We do not know the expected size on the first dimension
         expected_y_pred_shape = (-1, self.channels, self.width, self.height)
         if self.y_pred.shape[1:] != expected_y_pred_shape[1:]:
