@@ -1,5 +1,7 @@
+import collections
 import os
 from pathlib import Path
+from typing import List
 
 from rampwf.utils.importing import import_module_from_source
 
@@ -29,22 +31,23 @@ class ImageGenerative():
         self.chunk_size_feeder: int = chunk_size_feeder
         self.seed = seed
 
-    def train_submission(self, module_path, X_df, y_array, train_is=None):
+    def train_submission(self, module_path, X_array, y_array, train_is=None):
         """Train a batch image classifier.
         module_path : str
             module where the submission is. the folder of the module
             have to contain generator.py.
         X_array : ArrayContainer vector of int
-            vector of image IDs to train on
-            (it is named X_array to be coherent with the current API,
-             but as said here, it does not represent the data itself,
+
              only image IDs).
         y_array : vector of int
-            vector of image labels corresponding to X_train
+
         train_is : vector of int
            indices from X_array to train on
         """
+
         # Note : le type de X_df dépend du get_train_data in problem.py
+        assert isinstance(X_array, tuple)  # X_array : tuple de path
+        assert isinstance(y_array, tuple)  # tuple de path
 
         image_generator = import_module_from_source(
             os.path.join(module_path, self.elements_names[0] + ".py"),
@@ -53,12 +56,15 @@ class ImageGenerative():
         )
 
         generator = image_generator.Generator(latent_space_dimension=self.latent_space_dimension)
-        # X_df = list de path
-        # We convert X_df (list of path) to BatchGeneratorBuilderNoValidNy
-        folders = set(path_.parent.name for path_ in X_df)  # we retrieve folders required by the data
+
+        # we retrieve slected image with indices provided by train_is
+        selected_images: List = [X_array[indice] for indice in train_is]
+
+        # We convert selected_images (list of path) to BatchGeneratorBuilderNoValidNy
+        folders = set(path_.parent.name for path_ in selected_images)  # we retrieve folders required by the data
         assert len(folders) == 1, f"They are not exactly one folder ({len(folders)}) {folders=}"
         folder = tuple(folders)[0]
-
+        print(f"Train on {folder=}")
         images_names = [str(path.absolute()) for path in (Path("data") / folder).glob("*.jpg")]
 
         g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder, n_jobs=-1)
@@ -96,7 +102,8 @@ class ImageGenerative():
                     raise ValueError(
                         f"The first dimension of the np.array returned by the generate function must be {len(batch)} in this case, found {res_numpy.shape[0]}")
                 if np.isnan(res_numpy).any():
-                    raise ValueError(f"Output of the generate function must be a np.ndarray without nan, {np.isnan(res_numpy).sum()} nan found")
+                    raise ValueError(
+                        f"Output of the generate function must be a np.ndarray without nan, {np.isnan(res_numpy).sum()} nan found")
                 if np.isinf(res_numpy).any():
                     raise ValueError(
                         f"Output of the generate function must be a np.ndarray without inf, {np.isinf(res_numpy).sum()} nan found")

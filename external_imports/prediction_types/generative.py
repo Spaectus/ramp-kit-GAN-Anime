@@ -13,6 +13,7 @@ from workflows.image_generative import KnownLengthGenerator
 
 class BaseImgGen(BasePrediction):
     def valid_indexes(self):
+        raise NotImplementedError
         if len(self.y_pred.shape) <= 3:
             ValueError('y_pred.shape <= 3 is not implemented')
         elif len(self.y_pred.shape) == 4:
@@ -25,8 +26,8 @@ class BaseImgGen(BasePrediction):
         assert self.channels is not None
         assert self.height is not None
         assert self.width is not None
-        if not isinstance(self.y_pred, (Generator, KnownLengthGenerator, tuple)):
-            raise ValueError(f"y_pred should be a generator or a tuple, {type(self.y_pred)} found")
+        if not isinstance(self.y_pred, (Generator, KnownLengthGenerator, tuple, type(None))):
+            raise ValueError(f"y_pred should be a generator or a tuple or NoneType, {type(self.y_pred)} found")
 
     def set_valid_in_train(self, predictions, test_is):
         """Set a cross-validation slice."""

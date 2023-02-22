@@ -26,7 +26,6 @@ class Generator():
         :return: matrix of size (nb_image, 3, 64, 64)
         """
         nb_image = latent_space_noise.shape[0]
-        print("Startink kit generator")
         assert len(
             self.memory) >= nb_image, f"We do not saved enough images ! We saved {len(self.memory)} but we need {nb_image}"
 
