@@ -3,7 +3,7 @@ from pathlib import Path
 import zipfile
 
 tmp_filename = "archive.zip"
-LOCAL_DATA = Path(__file__).parent / "data"
+LOCAL_DATA = Path(__file__).parent
 LOCAL_DATA.mkdir(exist_ok=True)
 
 urllib.request.urlretrieve(
