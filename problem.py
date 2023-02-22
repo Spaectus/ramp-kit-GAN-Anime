@@ -60,13 +60,16 @@ predictions_train_train = problem.Predictions(
 # Fréchet Inception Distance (FID)
 class FID(BaseScoreType):
     def __init__(self, name='fid_score'):
-        self.fid = FrechetInceptionDistance(reset_real_features=True)
+        self.fid = FrechetInceptionDistance(reset_real_features=True).to(device)
         self.name = name
 
     def __call__(self, y_true, y_pred):
         for batch in y_true:
-            self.fid.update(y_true, real=True)
-        self.fid.update(y_pred, real=False)
+            batch_ = torch.Tensor(batch).to(device)
+            self.fid.update(batch_, real=True)
+        for batch in y_pred:
+            batch_ = torch.Tensor(batch).to(device)
+            self.fid.update(batch_, real=False)
         score = self.fid.compute()
         return score
 
@@ -78,7 +81,7 @@ class FID(BaseScoreType):
 
 class KID(BaseScoreType):
     def __init__(self, name='kid_mean'):
-        self.kid = KernelInceptionDistance(reset_real_features=True)
+        self.kid = KernelInceptionDistance(reset_real_features=True).to(device)
         self.name = name
 
     def __call__(self, y_true, y_pred):
