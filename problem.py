@@ -30,7 +30,7 @@ problem_title = "GAN Anime"
 # -----------------------------------------------------------------------------
 
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
-workflow = ImageGenerative(n_images_generated=100, latent_space_dimension=1024)
+workflow = ImageGenerative(n_images_generated=10_000, latent_space_dimension=1024)
 
 # -----------------------------------------------------------------------------
 # Predictions type
@@ -99,9 +99,10 @@ class FID(BaseScoreType):
     precision = 2
 
     def __init__(self, name='fid_score'):
-        self.fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
+        # self.fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
         self.name = name
         self.batch_size = 32
+        self.score = None
 
     def check_y_pred_dimensions(self, y_true, y_pred):
         pass
@@ -109,7 +110,7 @@ class FID(BaseScoreType):
     def __call__(self, y_true, y_pred):
         assert isinstance(y_true, tuple)
         # y_pred is generator with len
-
+        fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
         # Handling true data
         dataset = ImageSet(
             paths=y_true,
@@ -123,28 +124,21 @@ class FID(BaseScoreType):
         )
         for batch in loader:
             batch_ = batch.to(device)
-            self.fid.update(batch_, real=True)
-
+            # print(batch_)
+            fid.update(batch_, real=True)
+        i=-1
         # Handling generated data
-        batch = []
-        for data in y_pred:
-            print(type(data))
-            print(next(data).size())
-            print(y_pred)
-            # print([data_ for data_ in data])
-            batch.append(data)
-            if len(batch) >= self.batch_size:
-                batch_ = torch.Tensor(batch).to(device)
-                self.fid.update(batch_, real=False)
-                batch = []
-        ## Last batch
-        if len(batch) > 0:
-            batch_ = torch.Tensor(batch).to(device)
-            self.fid.update(batch_, real=False)
-        
+        for i, batch in enumerate(y_pred):
+            batch_ = torch.Tensor(batch/255).to(device)
+            # print(batch_.size())
+            fid.update(batch_, real=False)
+        assert i !=-1
         # Compute score
-        score = self.fid.compute()
-        return score
+        self.score = fid.compute().item()
+        
+        # Destroy the former instance of FID
+        # self.fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
+        return self.score
 
 
 # Kernel Inception Distance (KID)
@@ -152,7 +146,7 @@ class FID(BaseScoreType):
 # TODO: see if we can combine both into one type of score because computing the core twice
 # is expensive.
 
-class KID(BaseScoreType):
+class KID(object):
     def __init__(self, name='kid_mean'):
         self.kid = KernelInceptionDistance(reset_real_features=True).to(device)
         self.name = name
@@ -171,6 +165,27 @@ class KID(BaseScoreType):
         score = self.kid.compute()
         # score = (mean, std)
         return score[0]
+
+class KID(object):
+    def __init__(self, name='kid_mean'):
+        self.kid = KernelInceptionDistance(reset_real_features=True).to(device)
+        self.name = name
+
+    def check_y_pred_dimensions(self, y_true, y_pred):
+        pass
+
+    def __call__(self, y_true, y_pred):
+        # y_true = X ; y_pred = X_gen = G(z)
+        for batch in y_true:
+            batch_ = torch.Tensor(batch_).to(device)
+            self.kid.update(batch_, real=True)
+        for batch in y_pred:
+            batch_ = torch.Tensor(batch).to(device)
+            self.kid.update(batch_, real=False)
+        score = self.kid.compute()
+        # score = (mean, std)
+        return score[0]
+
 
 
 # Inception Score
