@@ -5,7 +5,10 @@ y_pred can be one or two-dimensional (for multi-target regression)
 # Author: MAI Huu Tan
 
 import numpy as np
+from collections.abc import Generator
 from rampwf.prediction_types.base import BasePrediction
+
+from workflows.image_generative import KnownLengthGenerator
 
 
 class BaseImgGen(BasePrediction):
@@ -22,26 +25,23 @@ class BaseImgGen(BasePrediction):
         assert self.channels is not None
         assert self.height is not None
         assert self.width is not None
-        return None # TODO how to check a generator ?
-        # We do not know the expected size on the first dimension
-        expected_y_pred_shape = (-1, self.channels, self.width, self.height)
-        if self.y_pred.shape[1:] != expected_y_pred_shape[1:]:
-            raise ValueError(f"Wrong y_pred dimensions. Found y_pred.shape={self.y_pred.shape}, expect {expected_y_pred_shape}")
+        if not isinstance(self.y_pred, (Generator, KnownLengthGenerator, tuple)):
+            raise ValueError(f"y_pred should be a generator or a tuple, {type(self.y_pred)} found")
 
     def set_valid_in_train(self, predictions, test_is):
         """Set a cross-validation slice."""
         # No test data for our use case
         # print(f"in set_valid_in_train {test_is=}\n{type(predictions.y_pred)=}") # TODO
 
-        self.y_pred = predictions.y_pred # TODO
-        #self.y_pred[test_is] = predictions.y_pred
+        self.y_pred = predictions.y_pred  # TODO
+        # self.y_pred[test_is] = predictions.y_pred
 
     def set_slice(self, valid_indexes):
         """Collapsing y_pred to a cross-validation slice.
         So scores do not need to deal with masks.
         """
-        pass # TODO
-        #self.y_pred = self.y_pred[valid_indexes]
+        pass  # TODO
+        # self.y_pred = self.y_pred[valid_indexes]
 
     @classmethod
     def combine(cls, predictions_list, index_list=None):
@@ -71,8 +71,8 @@ class BaseImgGen(BasePrediction):
         y_comb_list = np.array(
             [predictions_list[i].y_pred for i in index_list])
         # print(f"{y_comb_list=}")
-        #assert len(index_list) == 1
-        return cls(y_pred = y_comb_list[0]) # TODO
+        # assert len(index_list) == 1
+        return cls(y_pred=y_comb_list[0])  # TODO
 
         # I expect to see RuntimeWarnings in this block
         with warnings.catch_warnings():
@@ -80,6 +80,7 @@ class BaseImgGen(BasePrediction):
             y_comb = np.nanmean(y_comb_list, axis=0)
         combined_predictions = cls(y_pred=y_comb)
         return combined_predictions
+
 
 def _generation_init(self, y_pred=None, y_true=None, n_samples=None,
                      fold_is=None):
@@ -121,8 +122,9 @@ def _generation_init(self, y_pred=None, y_true=None, n_samples=None,
             'Missing init argument: y_pred, y_true, or n_samples')
     self.check_y_pred_dimensions()
 
+
 def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
-                     fold_is=None, channels=None, height=None, width=None):
+                         fold_is=None, channels=None, height=None, width=None):
     """Initialize a generation prediction type.
     The input is either y_pred, or y_true, or n_samples.
     Parameters
@@ -160,12 +162,13 @@ def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
     else:
         if y_pred is None:
             if y_true is None:
-                self.y_pred = None # TODO
+                self.y_pred = None  # TODO
             else:
                 self.y_pred = y_true
         else:
             self.y_pred = y_pred
     self.check_y_pred_dimensions()
+
 
 def make_generative(label_names=[]):
     """Creates a prediction type for generative challenges, based on regression.
@@ -185,6 +188,7 @@ def make_generative(label_names=[]):
          '__init__': _generation_init,
          })
     return Predictions
+
 
 def make_generative_img(channels, height, width):
     Predictions = type(
