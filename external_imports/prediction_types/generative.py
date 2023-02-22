@@ -28,6 +28,58 @@ class BaseImgGen(BasePrediction):
         if self.y_pred.shape[1:] != expected_y_pred_shape[1:]:
             raise ValueError(f"Wrong y_pred dimensions. Found y_pred.shape={self.y_pred.shape}, expect {expected_y_pred_shape}")
 
+    def set_valid_in_train(self, predictions, test_is):
+        """Set a cross-validation slice."""
+        # No test data for our use case
+        # print(f"in set_valid_in_train {test_is=}\n{type(predictions.y_pred)=}") # TODO
+
+        self.y_pred = predictions.y_pred # TODO
+        #self.y_pred[test_is] = predictions.y_pred
+
+    def set_slice(self, valid_indexes):
+        """Collapsing y_pred to a cross-validation slice.
+        So scores do not need to deal with masks.
+        """
+        pass # TODO
+        #self.y_pred = self.y_pred[valid_indexes]
+
+    @classmethod
+    def combine(cls, predictions_list, index_list=None):
+        """Combine predictions in predictions_list[index_list].
+        The default implemented here is by taking the mean of their y_pred
+        views. It can be overridden in derived classes.
+        E.g. for regression it is the actual
+        predictions, and for classification it is the probability array (which
+        should be calibrated if we want the best performance). Called both for
+        combining one submission on cv folds (a single model that is trained on
+        different folds) and several models on a single fold (blending).
+        Parameters
+        ----------
+        predictions_list : list of instances of Base
+            Each element of the list is an instance of Base with the
+            same length and type.
+        index_list : None | list of integers
+            The subset of predictions to be combined. If None, the full set is
+            combined.
+        Returns
+        -------
+        combined_predictions : instance of cls
+            A predictions instance containing the combined predictions.
+        """
+        if index_list is None:  # we combine the full list
+            index_list = range(len(predictions_list))
+        y_comb_list = np.array(
+            [predictions_list[i].y_pred for i in index_list])
+        # print(f"{y_comb_list=}")
+        #assert len(index_list) == 1
+        return cls(y_pred = y_comb_list[0]) # TODO
+
+        # I expect to see RuntimeWarnings in this block
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', category=RuntimeWarning)
+            y_comb = np.nanmean(y_comb_list, axis=0)
+        combined_predictions = cls(y_pred=y_comb)
+        return combined_predictions
 
 def _generation_init(self, y_pred=None, y_true=None, n_samples=None,
                      fold_is=None):
@@ -75,11 +127,8 @@ def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
     The input is either y_pred, or y_true, or n_samples.
     Parameters
     ----------
-    y_pred : a numpy array
-        representing the predictions returned by
-        problem.workflow.test_submission; 1D (single target regression)
-        or 2D (multi-target regression)
-    y_true : a numpy array
+    y_pred : a generator
+    y_true :
         representing the ground truth returned by problem.get_train_data
         and problem.get_test_data; 1D (single target regression)
         or 2D (multi-target regression)
@@ -89,23 +138,34 @@ def _generation_img_init(self, y_pred=None, y_true=None, n_samples=None,
         either the training indices, validation indices, or None when we
         use the (full) test data.
     """
-    if y_pred is not None:
-        if fold_is is not None:
-            y_pred = y_pred[fold_is]
-        self.y_pred = np.array(y_pred)
-    elif y_true is not None:
-        if fold_is is not None:
-            y_true = y_true[fold_is]
-        self.y_pred = np.array(y_true)
-    elif n_samples is not None:
-        shape = (n_samples, self.channels, self.height, self.width)
-        self.y_pred = np.empty(shape, dtype=float)
-        self.y_pred.fill(np.nan)
+    if 0:
+        print(f"{type(y_pred)=}")
+        print(f"{type(y_true)=}")
+    if 0:
+        if y_pred is not None:
+            if fold_is is not None:
+                y_pred = y_pred[fold_is]
+            self.y_pred = np.array(y_pred)
+        elif y_true is not None:
+            if fold_is is not None:
+                y_true = y_true[fold_is]
+            self.y_pred = np.array(y_true)
+        elif n_samples is not None:
+            shape = (n_samples, self.channels, self.height, self.width)
+            self.y_pred = np.empty(shape, dtype=float)
+            self.y_pred.fill(np.nan)
+        else:
+            raise ValueError(
+                'Missing init argument: y_pred, y_true, or n_samples')
     else:
-        raise ValueError(
-            'Missing init argument: y_pred, y_true, or n_samples')
+        if y_pred is None:
+            if y_true is None:
+                self.y_pred = None # TODO
+            else:
+                self.y_pred = y_true
+        else:
+            self.y_pred = y_pred
     self.check_y_pred_dimensions()
-
 
 def make_generative(label_names=[]):
     """Creates a prediction type for generative challenges, based on regression.

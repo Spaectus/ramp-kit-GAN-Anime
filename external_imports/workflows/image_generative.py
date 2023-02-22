@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 from rampwf.utils.importing import import_module_from_source
 
 import numpy as np
@@ -47,7 +49,17 @@ class ImageGenerative():
         )
 
         generator = image_generator.Generator(latent_space_dimension=self.latent_space_dimension)
-        generator.fit(X_df)
+        # X_df = list de path
+        # We convert X_df (list of path) to BatchGeneratorBuilderNoValidNy
+        folders = set(path_.parent.name for path_ in X_df) # we retrieve folders required by the data
+        assert len(folders) == 1, f"They are not exactly one folder ({len(folders)}) {folders=}"
+        folder = tuple(folders)[0]
+
+        images_names = [str(path.absolute()) for path in (Path("data")/folder).glob("*.jpg")]
+
+        g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=2, n_jobs=-1)
+
+        generator.fit(g)
         return generator
 
     def test_submission(self, trained_model, X_array):
@@ -63,14 +75,14 @@ class ImageGenerative():
         latent_space_noise = np.random.normal(size=(self.n_images_generated, self.latent_space_dimension))
 
         batch_size = 64
+        def gen():
+            for i in range(0, self.n_images_generated, batch_size):
+                upper = min(i + batch_size, self.n_images_generated)
+                batch = latent_space_noise[i:upper]
+                res_numpy = generator.generate(batch)
 
-        for i in range(0, self.n_images_generated, batch_size):
-            upper = min(i + batch_size, self.n_images_generated)
-            batch = latent_space_noise[i:upper]
-            res_numpy = generator.generate(batch)
-
-            yield res_numpy
-
+                yield res_numpy
+        return KnownLengthGenerator(gen(), self.n_images_generated)
 
 class BatchGeneratorBuilderNoValidNy():
     """A batch generator builder for generating images on the fly.
@@ -148,7 +160,6 @@ class BatchGeneratorBuilderNoValidNy():
         # and the user specifies the total number of epochs, it will
         # be able to end.
         while True:
-            print(f"indices {indices=}, {indices.dtype=}")
             it = _chunk_iterator(
                 X_array=self.X_array[indices], folder=self.folder,
                 n_jobs=self.n_jobs)
@@ -160,7 +171,6 @@ class BatchGeneratorBuilderNoValidNy():
                 # print("X")
                 # print(f"{X[0].shape} {X[0].dtype=}")
                 X = [np.moveaxis(x, -1, 0) for x in X]  # TODO when X : np.array
-                print(f"{X[0].shape} {X[0].dtype=}")
                 try:
                     X = np.array(X)
                 except ValueError as e:
@@ -202,7 +212,7 @@ def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
     vary according to examples (hence the fact that X is a list instead of
     numpy array).
     """
-    from skimage.io import imread
+    from skimage.io import imread #TODO
     from joblib import delayed
     from joblib import Parallel
     for i in range(0, len(X_array), chunk_size):
@@ -213,3 +223,18 @@ def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
         X = Parallel(n_jobs=n_jobs, backend='threading')(delayed(imread)(
             filename) for filename in filenames)
         yield X
+
+
+class KnownLengthGenerator:
+    def __init__(self, gen, length):
+        self.gen = gen
+        self.length = int(length)
+
+    def __len__(self):
+        return self.length
+
+    def __iter__(self):
+        yield from self.gen
+
+    def __next__(self):
+        return next(self.gen)

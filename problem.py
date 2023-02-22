@@ -59,11 +59,20 @@ predictions_train_train = problem.Predictions(
 
 # Fréchet Inception Distance (FID)
 class FID(BaseScoreType):
+    precision = 2
+
     def __init__(self, name='fid_score'):
         self.fid = FrechetInceptionDistance(reset_real_features=True).to(device)
         self.name = name
 
+    def check_y_pred_dimensions(self, y_true, y_pred):
+        pass
+
     def __call__(self, y_true, y_pred):
+        assert isinstance(y_true, tuple)
+        # y_pred is generator with len
+        return 1.
+
         for batch in y_true:
             batch_ = torch.Tensor(batch).to(device)
             self.fid.update(batch_, real=True)
@@ -84,6 +93,9 @@ class KID(BaseScoreType):
         self.kid = KernelInceptionDistance(reset_real_features=True).to(device)
         self.name = name
 
+    def check_y_pred_dimensions(self, y_true, y_pred):
+        pass
+
     def __call__(self, y_true, y_pred):
         # y_true = X ; y_pred = X_gen = G(z)
         for batch in y_true:
@@ -95,6 +107,7 @@ class KID(BaseScoreType):
         score = self.kid.compute()
         # score = (mean, std)
         return score[0]
+
 
 # Inception Score
 
@@ -142,32 +155,33 @@ def get_cv(X, y):
 
 
 def _read_data(path, str_: str):
-    assert Path("data/images").exists(), f"Please download the data with `python download_data.py`"
-    paths = tuple(Path("data/images").glob("*.jpg"))
-    n_images = len(paths)
-    assert n_images, f"No jpg images found in data/images"
-    if 1:
-        import torchvision
-        assert width == height, f"This part of the code can handle only square images"
-        dataset = torchvision.datasets.ImageFolder(root="data",
-                                                   transform=torchvision.transforms.Compose([
-                                                       torchvision.transforms.Resize(width),
-                                                       torchvision.transforms.CenterCrop(width),
-                                                       torchvision.transforms.ToTensor(),
-                                                       torchvision.transforms.Normalize((0.5, 0.5, 0.5),
-                                                                                        (0.5, 0.5, 0.5)),
-                                                      ]))
-    else:
-        dataset = tuple(zip([np.empty((channels, width, height))], range(1)))
+    if 0:
+        assert Path("data/images").exists(), f"Please download the data with `python download_data.py`"
+        paths = tuple(Path("data/images").glob("*.jpg"))
+        n_images = len(paths)
+        assert n_images, f"No jpg images found in data/images"
+        if 1:
+            import torchvision
+            assert width == height, f"This part of the code can handle only square images"
+            dataset = torchvision.datasets.ImageFolder(root="data",
+                                                       transform=torchvision.transforms.Compose([
+                                                           torchvision.transforms.Resize(width),
+                                                           torchvision.transforms.CenterCrop(width),
+                                                           torchvision.transforms.ToTensor(),
+                                                           torchvision.transforms.Normalize((0.5, 0.5, 0.5),
+                                                                                            (0.5, 0.5, 0.5)),
+                                                       ]))
+        else:
+            dataset = tuple(zip([np.empty((channels, width, height))], range(1)))
 
     test = os.getenv("RAMP_TEST_MODE", 0)
     # for the "quick-test" mode, use less data
     if test:
         n_images = 100  # TODO
 
-    res = []
+    res = tuple()
     for i in range(2):
-        res.extend(tuple(Path(f"data/tain{i}").glob("*.jpg")))
+        res += tuple(Path(f"data/train{i}").glob("*.jpg"))
     if test:
         return res[:100], res[:100]
     return res, res
