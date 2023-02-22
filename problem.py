@@ -30,7 +30,7 @@ problem_title = "GAN Anime"
 # -----------------------------------------------------------------------------
 
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
-workflow = ImageGenerative(n_images_generated=10_000, latent_space_dimension=1024)
+workflow = ImageGenerative(n_images_generated=3000, latent_space_dimension=1024)
 
 # -----------------------------------------------------------------------------
 # Predictions type
@@ -111,6 +111,19 @@ class FID(BaseScoreType):
         assert isinstance(y_true, tuple)
         # y_pred is generator with len
         fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
+
+        i=-1
+        # Handling generated data
+        for i, batch in enumerate(y_pred):
+            batch_ = torch.Tensor(batch/255).to(device)
+            # print(batch_.size())
+            fid.update(batch_, real=False)
+        # If the generator is empty, it means that we already went through
+        # this dataset.
+        if i == -1 and not self.score is None:
+            print("Generator is empty. We reuse the same previous score.")
+            return self.score
+        
         # Handling true data
         dataset = ImageSet(
             paths=y_true,
@@ -126,13 +139,6 @@ class FID(BaseScoreType):
             batch_ = batch.to(device)
             # print(batch_)
             fid.update(batch_, real=True)
-        i=-1
-        # Handling generated data
-        for i, batch in enumerate(y_pred):
-            batch_ = torch.Tensor(batch/255).to(device)
-            # print(batch_.size())
-            fid.update(batch_, real=False)
-        assert i !=-1
         # Compute score
         self.score = fid.compute().item()
         
