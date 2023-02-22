@@ -51,11 +51,11 @@ class ImageGenerative():
         generator = image_generator.Generator(latent_space_dimension=self.latent_space_dimension)
         # X_df = list de path
         # We convert X_df (list of path) to BatchGeneratorBuilderNoValidNy
-        folders = set(path_.parent.name for path_ in X_df) # we retrieve folders required by the data
+        folders = set(path_.parent.name for path_ in X_df)  # we retrieve folders required by the data
         assert len(folders) == 1, f"They are not exactly one folder ({len(folders)}) {folders=}"
         folder = tuple(folders)[0]
 
-        images_names = [str(path.absolute()) for path in (Path("data")/folder).glob("*.jpg")]
+        images_names = [str(path.absolute()) for path in (Path("data") / folder).glob("*.jpg")]
 
         g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=2, n_jobs=-1)
 
@@ -74,15 +74,19 @@ class ImageGenerative():
         # Gaussian noise is generated for the latent space.
         latent_space_noise = np.random.normal(size=(self.n_images_generated, self.latent_space_dimension))
 
+        #return KnownLengthGenerator(generator.generate(latent_space_noise), self.n_images_generated)
+
         batch_size = 64
+
         def gen():
             for i in range(0, self.n_images_generated, batch_size):
                 upper = min(i + batch_size, self.n_images_generated)
                 batch = latent_space_noise[i:upper]
                 res_numpy = generator.generate(batch)
-
                 yield res_numpy
+
         return KnownLengthGenerator(gen(), self.n_images_generated)
+
 
 class BatchGeneratorBuilderNoValidNy():
     """A batch generator builder for generating images on the fly.
@@ -170,12 +174,13 @@ class BatchGeneratorBuilderNoValidNy():
                 #     self.transform_img)(x) for x in X)
                 # print("X")
                 # print(f"{X[0].shape} {X[0].dtype=}")
+
+                # X shape : 64 x 64 x 3
                 X = [np.moveaxis(x, -1, 0) for x in X]  # TODO when X : np.array
-                try:
-                    X = np.array(X)
-                except ValueError as e:
-                    # can't because all image not same size
-                    pass
+                # W
+                X = np.array(X)
+
+
                 # 2) Yielding mini-batches
                 for i in range(0, len(X), batch_size):
                     yield X[i:i + batch_size]
@@ -212,7 +217,7 @@ def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
     vary according to examples (hence the fact that X is a list instead of
     numpy array).
     """
-    from skimage.io import imread #TODO
+    from skimage.io import imread  # TODO
     from joblib import delayed
     from joblib import Parallel
     for i in range(0, len(X_array), chunk_size):

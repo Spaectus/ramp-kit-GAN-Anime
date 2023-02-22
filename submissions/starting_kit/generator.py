@@ -29,5 +29,8 @@ class Generator():
         assert len(
             self.memory) >= nb_image, f"We do not saved enough images ! We saved {len(self.memory)} but we need {nb_image}"
 
+        return self.memory[:nb_image]
+
         for i in range(nb_image):
+            assert self.memory[i].shape == (3, 64, 64), f"{self.memory[i].shape=}"
             yield self.memory[i]
