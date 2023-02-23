@@ -13,6 +13,18 @@ from rampwf.score_types.base import BaseScoreType
 import numpy as np
 from PIL import Image
 
+import warnings
+
+def disable_kid_warnings():
+    import warnings
+    warnings.resetwarnings()  # Maybe somebody else is messing with the warnings system?
+    warnings.filterwarnings('ignore')  # Ignore everything
+    # ignore everything does not work: ignore specific messages, using regex
+    warnings.filterwarnings(
+        'ignore', '.*UserWarning: Metric `Kernel Inception Distance`*')
+
+disable_kid_warnings()
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 transform = Compose([
@@ -45,7 +57,7 @@ class ImageSet(Dataset):
 
 class Master():
     def __init__(self, n_fold=3):
-        self.batch_size = 64
+        self.batch_size = 32
         self.score = {}
         # [None, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3]
         self.pattern = [None] + [i for i in range(n_fold) for z in range(3)] + 50 * [n_fold]  # 6
@@ -58,14 +70,14 @@ class Master():
         self.memory_call[metric] += 1
         current_fold: int = self.pattern[self.memory_call[metric]]  # retrieve position in k_fold
         context = (metric, current_fold)
-        self.memory[context] += 1  # we count th enumber of call of each metric
+        self.memory[context] += 1  # we count the number of call of each metric
 
         if context in self.score:
             return self.score[context]
 
         if current_fold == self.n_fold:
-            # Bagged score
-            print("bagged score")
+            # TODO: Bagged score
+            #print("bagged score")
             return 1.
 
         if len(y_true) == 0:
@@ -73,16 +85,15 @@ class Master():
             # print(f"len(y_true) == 0 and {self.memory[context]=}")
             return self.score[context]
 
-        if metric == "FID":
-            metric_ = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
-        elif "KID" in metric:
-            metric_ = KernelInceptionDistance(reset_real_features=True, normalize=True).to(device)
+        fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
+        kid = KernelInceptionDistance(reset_real_features=True, normalize=True).to(device)
 
         i = -1
         # Handling generated data
         for i, batch in enumerate(y_pred):
             batch_ = torch.Tensor(batch / 255).to(device)
-            metric_.update(batch_, real=False)
+            fid.update(batch_, real=False)
+            kid.update(batch_, real=False)
 
         if i == -1:
             # assert self.memory[metric] == 2
@@ -111,25 +122,21 @@ class Master():
         loader = DataLoader(
             dataset,
             batch_size=self.batch_size,
-            shuffle=False  # TODO
+            shuffle=False
         )
         for batch in loader:
             batch_ = batch.to(device)
-            metric_.update(batch_,
-                       real=True)  # RuntimeError: DefaultCPUAllocator: not enough memory: you tried to allocate 536406000 bytes.
+            fid.update(batch_, real=True)
+            kid.update(batch_, real=True)
 
-        # Compute score
-        if metric == "FID":
-            self.score[context] = metric_.compute().item()
+        fid_score= fid.compute().item()
+        self.score[("FID", current_fold)] = fid_score
 
-            # Destroy the former instance of FID
-            # self.fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
-            return self.score[context]
-        elif "KID" in metric:
-            kid_mean, kid_std = metric_.compute()
-            self.score[("KID_mean", current_fold)] = kid_mean.item()
-            self.score[("KID_std", current_fold)] = kid_std.item()
-            return self.score[context]
+        kid_mean, kid_std = kid.compute()
+        self.score[("KID_mean", current_fold)] = kid_mean.item()
+        self.score[("KID_std", current_fold)] = kid_std.item()
+
+        return self.score[context]
 
 
 
@@ -169,7 +176,7 @@ class KIDMean(BaseScoreType):
 class KIDStd(BaseScoreType):
     precision = 1
 
-    def __init__(self, name="KID_mean"):
+    def __init__(self, name="KID_std"):
         self.name = name
 
     def check_y_pred_dimensions(self, y_true, y_pred):

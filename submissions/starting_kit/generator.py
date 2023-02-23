@@ -26,6 +26,9 @@ class Generator():
         :return: matrix of size (nb_image, 3, 64, 64)
         """
         nb_image = latent_space_noise.shape[0]
+
+        # return np.random.randn(nb_image, 3, 64, 64)
+
         assert len(
             self.memory) >= nb_image, f"We do not saved enough images ! We saved {len(self.memory)} but we need {nb_image}"
 
@@ -33,6 +36,6 @@ class Generator():
 
         return self.memory[:nb_image]
 
-        #for i in range(nb_image):
+        # for i in range(nb_image):
         #    assert self.memory[i].shape == (3, 64, 64), f"{self.memory[i].shape=}"
         #    yield self.memory[i]
