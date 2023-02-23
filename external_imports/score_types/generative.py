@@ -65,6 +65,10 @@ class Master():
         self.memory_call = Counter()
         self.memory = Counter()
         self.n_fold = n_fold
+        
+        self.fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
+        self.kid = KernelInceptionDistance(reset_real_features=True, normalize=True).to(device)
+        self.is_ = InceptionScore(normalize=True).to(device)
 
     def eval(self, y_true, y_pred, metric):
         assert metric in ("FID", "KID_mean", "KID_std", "IS_mean", "IS_std")
@@ -79,7 +83,20 @@ class Master():
         if current_fold == self.n_fold:
             # TODO: Bagged score
             #print("bagged score")
-            return 1.
+            
+            fid_score= self.fid.compute().item()
+            self.score[("FID", current_fold)] = fid_score
+
+            kid_mean, kid_std = self.kid.compute()
+            # We rescale the KID scores because otherwise they are too small and too close to 0.
+            self.score[("KID_mean", current_fold)] = kid_mean.item()*1000
+            self.score[("KID_std", current_fold)] = kid_std.item()*1000
+
+            is_mean, is_std = self.is_.compute()
+            self.score[("IS_mean", current_fold)] = is_mean.item()
+            self.score[("IS_std", current_fold)] = is_std.item()
+
+            return self.score[context]
 
         if len(y_true) == 0:
             # assert self.memory[metric] == 3
@@ -97,6 +114,9 @@ class Master():
             fid.update(batch_, real=False)
             kid.update(batch_, real=False)
             is_.update(batch_)
+            self.fid.update(batch_, real=False)
+            self.kid.update(batch_, real=False)
+            self.is_.update(batch_)
 
         if i == -1:
             # assert self.memory[metric] == 2
@@ -131,6 +151,8 @@ class Master():
             batch_ = batch.to(device)
             fid.update(batch_, real=True)
             kid.update(batch_, real=True)
+            self.fid.update(batch_, real=True)
+            self.kid.update(batch_, real=True)
 
         fid_score= fid.compute().item()
         self.score[("FID", current_fold)] = fid_score
