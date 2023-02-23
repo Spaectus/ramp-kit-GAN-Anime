@@ -17,7 +17,7 @@ from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
 
 from prediction_types.generative import make_generative_img
-from score_types.generative import KID, FID, Troll
+from score_types.generative import KIDMean, KIDStd, FID
 
 problem_title = "GAN Anime"
 
@@ -26,7 +26,7 @@ problem_title = "GAN Anime"
 # -----------------------------------------------------------------------------
 
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
-workflow = ImageGenerative(n_images_generated=10, latent_space_dimension=1024, y_pred_batch_size=32,
+workflow = ImageGenerative(n_images_generated=1000, latent_space_dimension=1024, y_pred_batch_size=32,
                            chunk_size_feeder=64,
                            seed=23)
 
@@ -57,9 +57,9 @@ predictions_train_train = problem.Predictions(
 
 score_types = [
     # Fréchet Inception Distance
-    # FID(),
-    # KID()
-    Troll()
+    FID(),
+    KIDMean(),
+    KIDStd()
 ]
 
 
@@ -124,8 +124,10 @@ def _read_data(path, str_: str):
     test = os.getenv("RAMP_TEST_MODE", 0)
     # for the "quick-test" mode, use less data
     if test:
+        rng = np.random.RandomState(seed=0)
+        selection = tuple(rng.choice(res, size=6000, replace=False))
         print(f"Warning : Can't get correctly 3 folds in --quick-test, not enough data !")
-        return res[:100], res[:100]
+        return selection, selection
     return res, res
 
 
