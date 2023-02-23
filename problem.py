@@ -17,7 +17,7 @@ from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
 
 from prediction_types.generative import make_generative_img
-from score_types.generative import KIDMean, KIDStd, FID
+from score_types.generative import KIDMean, KIDStd, FID, ISMean, ISStd
 
 problem_title = "GAN Anime"
 
@@ -26,7 +26,7 @@ problem_title = "GAN Anime"
 # -----------------------------------------------------------------------------
 
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
-workflow = ImageGenerative(n_images_generated=1000, latent_space_dimension=1024, y_pred_batch_size=32,
+workflow = ImageGenerative(n_images_generated=3000, latent_space_dimension=1024, y_pred_batch_size=32,
                            chunk_size_feeder=64,
                            seed=23)
 
@@ -56,10 +56,11 @@ predictions_train_train = problem.Predictions(
 
 
 score_types = [
-    # Fréchet Inception Distance
     FID(),
     KIDMean(),
-    KIDStd()
+    KIDStd(),
+    ISMean(),
+    ISStd()
 ]
 
 

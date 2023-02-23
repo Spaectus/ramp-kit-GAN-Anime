@@ -8,6 +8,7 @@ from torchvision.transforms import Compose, CenterCrop, Resize, ToTensor, Normal
 import torch
 from torchmetrics.image.fid import FrechetInceptionDistance
 from torchmetrics.image.kid import KernelInceptionDistance
+from torchmetrics.image.inception import InceptionScore
 from torch import from_numpy
 from rampwf.score_types.base import BaseScoreType
 import numpy as np
@@ -66,7 +67,7 @@ class Master():
         self.n_fold = n_fold
 
     def eval(self, y_true, y_pred, metric):
-        assert metric in ("FID", "KID_mean", "KID_std")
+        assert metric in ("FID", "KID_mean", "KID_std", "IS_mean", "IS_std")
         self.memory_call[metric] += 1
         current_fold: int = self.pattern[self.memory_call[metric]]  # retrieve position in k_fold
         context = (metric, current_fold)
@@ -87,6 +88,7 @@ class Master():
 
         fid = FrechetInceptionDistance(reset_real_features=True, normalize=True).to(device)
         kid = KernelInceptionDistance(reset_real_features=True, normalize=True).to(device)
+        is_ = InceptionScore(normalize=True).to(device)
 
         i = -1
         # Handling generated data
@@ -94,6 +96,7 @@ class Master():
             batch_ = torch.Tensor(batch / 255).to(device)
             fid.update(batch_, real=False)
             kid.update(batch_, real=False)
+            is_.update(batch_)
 
         if i == -1:
             # assert self.memory[metric] == 2
@@ -133,8 +136,13 @@ class Master():
         self.score[("FID", current_fold)] = fid_score
 
         kid_mean, kid_std = kid.compute()
-        self.score[("KID_mean", current_fold)] = kid_mean.item()
-        self.score[("KID_std", current_fold)] = kid_std.item()
+        # We rescale the KID scores because otherwise they are too small and too close to 0.
+        self.score[("KID_mean", current_fold)] = kid_mean.item()*1000
+        self.score[("KID_std", current_fold)] = kid_std.item()*1000
+
+        is_mean, is_std = is_.compute()
+        self.score[("IS_mean", current_fold)] = is_mean.item()
+        self.score[("IS_std", current_fold)] = is_std.item()
 
         return self.score[context]
 
@@ -173,6 +181,7 @@ class KIDMean(BaseScoreType):
         assert isinstance(y_true, tuple)
         return MASTER.eval(y_true, y_pred, metric="KID_mean")
 
+
 class KIDStd(BaseScoreType):
     precision = 1
 
@@ -188,3 +197,29 @@ class KIDStd(BaseScoreType):
 
 
 # Inception Score
+
+class ISMean(BaseScoreType):
+    precision = 1
+
+    def __init__(self, name="IS_mean"):
+        self.name = name
+
+    def check_y_pred_dimensions(self, y_true, y_pred):
+        pass
+
+    def __call__(self, y_true, y_pred):
+        assert isinstance(y_true, tuple)
+        return MASTER.eval(y_true, y_pred, metric="IS_mean")
+    
+class ISStd(BaseScoreType):
+    precision = 1
+
+    def __init__(self, name="IS_std"):
+        self.name = name
+
+    def check_y_pred_dimensions(self, y_true, y_pred):
+        pass
+
+    def __call__(self, y_true, y_pred):
+        assert isinstance(y_true, tuple)
+        return MASTER.eval(y_true, y_pred, metric="IS_std")
