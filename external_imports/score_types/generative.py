@@ -78,6 +78,7 @@ class Master():
         self.memory[context] += 1  # we count the number of call of each metric
 
         if context in self.score:
+            # We have already compute this metric for this fold
             return self.score[context]
 
         if current_fold == self.n_fold:

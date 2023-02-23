@@ -19,7 +19,12 @@ from workflows.image_generative import ImageGenerative
 from prediction_types.generative import make_generative_img
 from score_types.generative import KIDMean, KIDStd, FID, ISMean, ISStd
 
-problem_title = "GAN Anime"
+problem_title = "Anime faces"
+
+width = 64
+height = 64
+channels = 3
+p = channels * height * width
 
 # -----------------------------------------------------------------------------
 # Worklow element
@@ -27,28 +32,18 @@ problem_title = "GAN Anime"
 
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
 workflow = ImageGenerative(n_images_generated=3000, latent_space_dimension=1024, y_pred_batch_size=32,
-                           chunk_size_feeder=64,
-                           seed=23)
+                           chunk_size_feeder=64, seed=23, channels=channels, width=width, height=height,
+                           n_jobs_batch_generator=-1)
 
 # -----------------------------------------------------------------------------
 # Predictions type
 # -----------------------------------------------------------------------------
-width = 64
-height = 64
-channels = 3
-p = channels * height * width
 
 Predictions = make_generative_img(
     height=height, width=width, channels=channels
 )
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# Will be executed line 232 by https://github.com/paris-saclay-cds/ramp-workflow/blob/master/rampwf/utils/submission.py the folowing code :
-"""
-predictions_train_train = problem.Predictions(
-        y_pred=y_pred_train, fold_is=train_is)
-"""
 
 # -----------------------------------------------------------------------------
 # Score types
@@ -98,17 +93,6 @@ def get_cv(X, y):
         valid_is = arange[vec_bool]  # train data and valid data are same in our case
         yield train_is, valid_is
 
-    """
-    # We will divided the dataset in n_fold equal set of images
-    support = np.linspace(0, n_fold, endpoint=False, num=size, dtype=int)
-    arange = np.arange(size)
-    for i in range(n_fold):
-        vec_bool = (support == i)  # vector of bool
-        # we convert vector of bool to vector of indices for train_is and valid_is
-        train_is = arange[vec_bool]
-        valid_is = arange[vec_bool]  # train data and valid data are same in our case
-        yield train_is, valid_is
-    """
 
 # -----------------------------------------------------------------------------
 # Training / testing data reader
@@ -116,19 +100,20 @@ def get_cv(X, y):
 
 
 def _read_data(path, str_: str):
-    res = tuple()
-    train_folders = tuple(Path("data").glob("train_*"))
+    train_folders = tuple((path / Path("data")).glob("train_*"))
     assert len(train_folders), f"Please dowload the data with python download_data.py"
-    for train_folder in train_folders:
-        res += tuple(train_folder.glob("*.jpg"))
-
     test = os.getenv("RAMP_TEST_MODE", 0)
-    # for the "quick-test" mode, use less data
-    if test:
-        rng = np.random.RandomState(seed=0)
-        selection = tuple(rng.choice(res, size=6000, replace=False))
-        print(f"Warning : Can't get correctly 3 folds in --quick-test, not enough data !")
-        return selection, selection
+    rng = np.random.RandomState(seed=0)
+
+    res = tuple()
+    for train_folder in train_folders:
+        if test:
+            # for the "quick-test" mode, use less data, only 2000 images per fold
+            res += tuple(rng.choice(tuple(train_folder.glob("*.jpg")), size=2000, replace=False))
+        else:
+            # otherwise we use all the data available
+            res += tuple(train_folder.glob("*.jpg"))
+
     return res, res
 
 
@@ -137,4 +122,4 @@ def get_train_data(path="."):
 
 
 def get_test_data(path="."):
-    return tuple(), tuple() #_read_data(path, "test")
+    return tuple(), tuple()

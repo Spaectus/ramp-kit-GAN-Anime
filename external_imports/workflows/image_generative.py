@@ -17,19 +17,26 @@ class ImageGenerative():
 
     def __init__(self, workflow_element_names=['generator'], n_images_generated: int = 100,
                  latent_space_dimension: int = 1024, y_pred_batch_size: int = 64, chunk_size_feeder: int = 128,
-                 seed: int = 23):
+                 seed: int = 23, channels: int = 3, width: int = 64, height: int = 64,
+                 n_jobs_batch_generator: int = -1):
         """
 
         :param n_images_generated: umber of images generated to evaluate a generator
         :param workflow_element_names:
         :param latent_space_dimension: number of real numbers needed to describe a point in the latent space
         """
+
+        self.channels = channels
+        self.width = width
+        self.height = height
         self.n_images_generated: int = n_images_generated
         self.latent_space_dimension: int = latent_space_dimension
         self.elements_names = workflow_element_names
         self.y_pred_batch_size = y_pred_batch_size
         self.chunk_size_feeder: int = chunk_size_feeder
         self.seed = seed
+        self.n_jobs_batch_generator = n_jobs_batch_generator
+
         self.rng = np.random.default_rng(seed=self.seed)
 
     def train_submission(self, module_path, X_array, y_array, train_is=None):
@@ -57,7 +64,7 @@ class ImageGenerative():
 
         generator = image_generator.Generator(latent_space_dimension=self.latent_space_dimension)
 
-        # we retrieve slected image with indices provided by train_is
+        # we retrieve selected images with indices provided by train_is
         selected_images: List = [X_array[indice] for indice in train_is]
 
         # We convert selected_images (list of path) to BatchGeneratorBuilderNoValidNy
@@ -67,7 +74,8 @@ class ImageGenerative():
         print(f"Train on {folder=}")
         images_names = [str(path.absolute()) for path in (Path("data") / folder).glob("*.jpg")]
 
-        g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder, n_jobs=-1)
+        g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder,
+                                           n_jobs=self.n_jobs_batch_generator)
 
         generator.fit(g)
         return generator
@@ -81,29 +89,31 @@ class ImageGenerative():
         """
         assert isinstance(X_array, tuple)
 
-        # print(f"test_submission {X_array[:10]=}")
-
-
         generator = trained_model  # we retieve the model trained by the train_submission
 
-        # Gaussian noise is generated for the latent space.
-        latent_space_noise = self.rng.normal(size=(self.n_images_generated, self.latent_space_dimension))
+        # Gaussian noise is generated for the latent space for the batch
+        #latent_space_noise = self.rng.normal(size=(self.n_images_generated, self.latent_space_dimension))
 
         # return KnownLengthGenerator(generator.generate(latent_space_noise), self.n_images_generated)
 
         def gen():
             for i in range(0, self.n_images_generated, self.y_pred_batch_size):
                 upper = min(i + self.y_pred_batch_size, self.n_images_generated)
-                batch = latent_space_noise[i:upper]
-                res_numpy = generator.generate(batch)
+                batch_size = upper - i
+                #batch = latent_space_noise[i:upper]
+                # Gaussian noise is generated for the latent space for the batch and given to the generator
+                res_numpy = generator.generate(self.rng.normal(size=(batch_size, self.latent_space_dimension)))
                 if not isinstance(res_numpy, np.ndarray):
                     raise ValueError(f"Output of generate function must be a np.ndarray, {type(res_numpy)} found")
                 if len(res_numpy.shape) != 4:
                     raise ValueError(
                         f"Output of the generate function must be a np.ndarray with exactly {4} dimensions, {len(res_numpy.shape)} found")
-                if res_numpy.shape[0] != len(batch):
+                if res_numpy.shape[0] != batch_size:
                     raise ValueError(
-                        f"The first dimension of the np.array returned by the generate function must be {len(batch)} in this case, found {res_numpy.shape[0]}")
+                        f"The first dimension of the np.array returned by the generate function must be {batch_size} in this case, found {res_numpy.shape[0]}")
+                if res_numpy.shape[1:] != (self.channels, self.height, self.width):
+                    raise ValueError(
+                        f"Output of the generate function must have shape {(batch_size, self.channels, self.height, self.width)}, found {res_numpy.shape}")
                 if np.isnan(res_numpy).any():
                     raise ValueError(
                         f"Output of the generate function must be a np.ndarray without nan, {np.isnan(res_numpy).sum()} nan found")
@@ -200,13 +210,11 @@ class BatchGeneratorBuilderNoValidNy():
                 # X = Parallel(
                 # n_jobs=self.n_jobs, backend='threading')(delayed(
                 #     self.transform_img)(x) for x in X)
-                # print("X")
-                # print(f"{X[0].shape} {X[0].dtype=}")
 
-                # X shape : 64 x 64 x 3
-                X = [np.moveaxis(x, -1, 0) for x in X]  # TODO when X : np.array
-                # W
-                X = np.array(X)
+
+                # X shape : b x 64 x 64 x 3
+                X = np.moveaxis(np.array(X), -1, 1)
+                # X shape : b x 3 x 64 x 64
 
                 # 2) Yielding mini-batches
                 for i in range(0, len(X), batch_size):
@@ -269,7 +277,7 @@ class KnownLengthGenerator:
         from itertools import tee
         original, new = tee(self.gen, 2)
         yield from new
-        #yield from self.gen
+        # yield from self.gen
 
     def __next__(self):
         print(f"Destruction of a generator !!")
