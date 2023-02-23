@@ -3,8 +3,7 @@ from pathlib import Path
 import zipfile
 
 tmp_filename = "archive.zip"
-LOCAL_DATA = Path(__file__).parent / "data"
-LOCAL_DATA.mkdir(exist_ok=True)
+LOCAL_DATA = Path(__file__).parent
 
 if 0:
     url = "https://drive.rezel.net/s/kfdPRTr8xdBmGkH/download/data.zip"
