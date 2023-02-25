@@ -1,17 +1,10 @@
 import os
 from pathlib import Path
-import itertools
-import getpass
 
 import torch
-from torch.utils.data import DataLoader, Dataset
-from torchvision.transforms import Compose, CenterCrop, Resize, ToTensor, Normalize
 
-import pandas as pd
 import numpy as np
 
-import rampwf as rw
-from rampwf.score_types.base import BaseScoreType
 
 from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
@@ -70,7 +63,7 @@ def get_cv(X, y):
     This should be done by defining a get_cv() function that takes the feature and target data as parameters and returns
     indices that can be used to split the data. If you are using a function with a random element, e.g.,
     StratifiedShuffleSplit() from scikit-learn, it is important to set the random seed. This ensures that the train and
-    valuidation data will be the same for all participants.
+    validation data will be the same for all participants.
 
     :param X:
     :param y:
@@ -82,7 +75,8 @@ def get_cv(X, y):
 
     train_folders = tuple((Path("data")).glob("train_*"))
     folders_names = sorted([p.name for p in train_folders])
-    map_ = {k: v for v, k in enumerate(folders_names)}  # {'train_1': 0, 'train_2': 1, 'train_3': 2}
+    # {'train_1': 0, 'train_2': 1, 'train_3': 2}
+    map_ = {k: v for v, k in enumerate(folders_names)}
 
     support = np.array([map_[path_img.parent.name] for path_img in X])
     arange = np.arange(len(y))
@@ -90,7 +84,8 @@ def get_cv(X, y):
         vec_bool = (support == i_fold)
         # we convert vector of bool to vector of indices for train_is and valid_is
         train_is = arange[vec_bool]
-        valid_is = arange[vec_bool]  # train data and valid data are same in our case
+        # train data and valid data are same in our case
+        valid_is = arange[vec_bool]
         yield train_is, valid_is
 
 
@@ -101,7 +96,8 @@ def get_cv(X, y):
 
 def _read_data(path, str_: str):
     train_folders = tuple((path / Path("data")).glob("train_*"))
-    assert len(train_folders), f"Please dowload the data with python download_data.py"
+    assert len(
+        train_folders), f"Please dowload the data with python download_data.py"
     test = os.getenv("RAMP_TEST_MODE", 0)
     rng = np.random.RandomState(seed=0)
 
@@ -109,7 +105,8 @@ def _read_data(path, str_: str):
     for train_folder in train_folders:
         if test:
             # for the "quick-test" mode, use less data, only 2000 images per fold
-            res += tuple(rng.choice(tuple(train_folder.glob("*.jpg")), size=2000, replace=False))
+            res += tuple(rng.choice(tuple(train_folder.glob("*.jpg")),
+                         size=2000, replace=False))
         else:
             # otherwise we use all the data available
             res += tuple(train_folder.glob("*.jpg"))
