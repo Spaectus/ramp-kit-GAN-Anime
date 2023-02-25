@@ -1,6 +1,4 @@
-import getpass
 from collections import Counter
-import random
 
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import Compose, ToTensor
@@ -10,6 +8,11 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 from torchmetrics.image.kid import KernelInceptionDistance
 from torchmetrics.image.inception import InceptionScore
 from rampwf.score_types.base import BaseScoreType
+
+import numpy as np
+import matplotlib.pyplot as plt
+import torchvision.utils as vutils
+
 from PIL import Image
 
 import gc
@@ -124,6 +127,9 @@ class Master():
             reset_real_features=True, normalize=True).to(device)
         self.is_ = InceptionScore(normalize=True).to(device)
 
+        # For plotting
+        self.displayed = None
+
     def eval(self, y_true, y_pred, metric):
         """Evaluates scores for a given metric on a certain fold.
 
@@ -164,8 +170,8 @@ class Master():
             self.score[("KID_std", current_fold)] = kid_std.item()*1000
 
             is_mean, is_std = self.is_.compute()
-            self.score[("IS_mean", current_fold)] = is_mean.item()
-            self.score[("IS_std", current_fold)] = is_std.item()
+            self.score[("IS_mean", current_fold)] = is_mean.item()*1000
+            self.score[("IS_std", current_fold)] = is_std.item()*1000
 
             return self.score[context]
 
@@ -183,13 +189,29 @@ class Master():
         i = -1
         # Handling generated data
         for i, batch in enumerate(y_pred):
-            batch_ = torch.Tensor(batch / 255).to(device)
+
+            batch_ = torch.Tensor(batch).to(device)
+
+            if i == 0:
+                self.displayed = vutils.make_grid(batch_, padding=2, normalize=True).cpu()
+                if not self.displayed is None:
+                    plt.figure(figsize=(8, 8))
+                    plt.axis("off")
+                    plt.title("Generated Images")
+                    plt.imshow(np.transpose(self.displayed, (1,2,0)))
+                    print("The first batch of images is displayed on a different window. Please close it to continue evaluation.")
+                    plt.show()
+
+
+
             fid.update(batch_, real=False)
             kid.update(batch_, real=False)
             is_.update(batch_)
             self.fid.update(batch_, real=False)
             self.kid.update(batch_, real=False)
             self.is_.update(batch_)
+
+
 
         if i == -1:
             # assert self.memory[metric] == 2

@@ -86,7 +86,7 @@ class Generator():
         self.g_features = 64
         self.d_features = 64
 
-        self.epochs = 1
+        self.epochs = 5
         self.lr = 2e-4
         self.beta1 = 0.5
 
@@ -115,11 +115,12 @@ class Generator():
         self.generator.load_state_dict(torch.load(PATH / "generator_19900.pth"))
         self.discriminator.load_state_dict(torch.load(PATH / "discriminator_19900.pth"))
 
-        for epoch in range(1, self.epochs + 1):
+        for epoch in tqdm(np.arange(1, self.epochs + 1)):
+            self.discriminator.to(self.device)
             generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(batch_size=self.batch_size)
             # nb_batches = total_nb_images // self.batch_size + 1 * (total_nb_images % self.batch_size !=0)
-            print(f"Epoch {epoch} of {self.epochs}.")
-            print("Total number of imgs :", total_nb_images)
+            # print(f"Epoch {epoch} of {self.epochs}.")
+            # print("Total number of imgs :", total_nb_images)
             # print(f'Last epoch average discriminator loss: {results["loss_d"][-1]}.')
             # print(f'Last epoch average generator loss: {results["loss_g"][-1]}.')
             # running = {
@@ -129,7 +130,7 @@ class Generator():
             #     "loss_d": 0.,
             #     "loss_g": 0.,
             # }
-            
+
             for idx, batch_ in enumerate(generator_of_images):
                 # (1) update the discriminator: maximize log(D(x)) + log(1 - D(G(z)))
                 # all-real batch
@@ -164,7 +165,7 @@ class Generator():
                 loss_g.backward()
                 self.optimizer_g.step()
 
-                print("Finished step")
+                # print("Finished step")
 
                 d_fake_score_2 = fake_out.mean().item()
                 steps += 1
@@ -187,6 +188,9 @@ class Generator():
             ndarray, shape (nb_image, 3, 64, 64): A mini-batch of `nb_image` colored (3 channels : RGB) images of size 64 x 64 from a matrix in the latent space.
         """
         # nb_image = latent_space_noise.shape[0]
+
+        # In order to save space on the GPU, we send the discriminator back to the CPU.
+        self.discriminator.to("cpu")
 
         with torch.no_grad():
             # We take a noise of size [nb_image, latent_size, 1, 1] for our generator.
