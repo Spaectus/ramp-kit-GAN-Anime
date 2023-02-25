@@ -7,9 +7,26 @@ class Generator():
     """
 
     def __init__(self, latent_space_dimension):
-        pass
+        """Initializes a Generator object that is used for `ramp` training and evaluation.
+        
+        This object is used to wrap your generator model and anything else required to train it and
+        to generate samples.
+
+        In this submission, only a rng is required.
+
+        Args:
+            latent_space_dimension (int): Dimension of the latent space, where inputs of the generator are sampled.
+        """
+        self.rng = np.random.RandomState(seed=0)
 
     def fit(self, batchGeneratorBuilderNoValidNy):
+        """Trains the generator with a batch generator builder, which can return a Python Generator with its method `get_train_generators`.
+
+        In this submission, this method does nothing.
+
+        Args:
+            batchGeneratorBuilderNoValidNy (_type_): _description_
+        """
         pass
 
     def generate(self, latent_space_noise):
@@ -23,8 +40,8 @@ class Generator():
         """
         nb_image = latent_space_noise.shape[0]
         # Generate random samples
-        rng = np.random.RandomState(seed=0)
-        res = np.abs(rng.randn(nb_image, 3, 64, 64))
+        
+        res = np.abs(self.rng.randn(nb_image, 3, 64, 64))
         res = res/res.max()
 
         return res

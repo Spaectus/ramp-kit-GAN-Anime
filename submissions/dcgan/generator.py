@@ -73,10 +73,21 @@ class DiscriminatorGAN(nn.Module):
 
 class Generator():
     """
-    This a DCGAN, implemented by François.
+    This is a DCGAN, implemented by François.
     """
 
     def __init__(self, latent_space_dimension):
+        """Initializes a Generator object that is used for `ramp` training and evaluation.
+        
+        This object is used to wrap your generator model and anything else required to train it and
+        to generate samples.
+
+        Args:
+            latent_space_dimension (int): Dimension of the latent space, where inputs of the generator are sampled.
+        """
+
+        # We force the latent space dimension because we load a pretrained model that only
+        # accounts for a latent space of dimension 100.
         self.latent_space_dimension: int = 100
 
         self.batch_size = 128
@@ -92,21 +103,28 @@ class Generator():
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
+        # Models
         self.generator = GeneratorGAN(self.channels, self.latent_space_dimension, self.g_features).to(self.device)
         self.discriminator = DiscriminatorGAN(self.channels, self.d_features).to(self.device)
 
-        self.criterion = nn.BCELoss()
-
-        # convention
+        # convention for labels
         self.real_label = 1.
         self.fake_label = 0.
 
+        # Optimizers
+        self.criterion = nn.BCELoss()
         self.optimizer_g = optim.Adam(self.generator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.optimizer_d = optim.Adam(self.discriminator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
 
     # def fit(self, image_folder: torchvision.datasets.ImageFolder):
     def fit(self, batchGeneratorBuilderNoValidNy):
+        """Trains the generator with a batch generator builder, which can return a Python Generator with its method `get_train_generators`.
+
+        In this submission, this method fine-tunes the pre-trained generator and discriminator.
+
+        Args:
+            batchGeneratorBuilderNoValidNy (_type_): _description_
+        """
 
         steps = 0
 
@@ -167,7 +185,7 @@ class Generator():
 
                 # print("Finished step")
 
-                d_fake_score_2 = fake_out.mean().item()
+                # d_fake_score_2 = fake_out.mean().item()
                 steps += 1
 
                 # running["d_real_score"] += d_real_score
