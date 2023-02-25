@@ -2,7 +2,7 @@
 y_pred can be one or two-dimensional (for multi-target regression)
 """
 
-# Author: MAI Huu Tan
+# Author: MAI Huu Tan, Alexandre Bigot
 
 import numpy as np
 from collections.abc import Generator

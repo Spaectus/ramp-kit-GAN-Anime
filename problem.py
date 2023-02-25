@@ -24,7 +24,7 @@ p = channels * height * width
 # -----------------------------------------------------------------------------
 
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
-workflow = ImageGenerative(n_images_generated=3000, latent_space_dimension=1024, y_pred_batch_size=32,
+workflow = ImageGenerative(n_images_generated=3000, latent_space_dimension=1024, y_pred_batch_size=128,
                            chunk_size_feeder=64, seed=23, channels=channels, width=width, height=height,
                            n_jobs_batch_generator=-1)
 
@@ -99,6 +99,7 @@ def _read_data(path, str_: str):
     assert len(
         train_folders), f"Please dowload the data with python download_data.py"
     test = os.getenv("RAMP_TEST_MODE", 0)
+
     rng = np.random.RandomState(seed=0)
 
     res = tuple()
@@ -110,6 +111,8 @@ def _read_data(path, str_: str):
         else:
             # otherwise we use all the data available
             res += tuple(train_folder.glob("*.jpg"))
+        
+    assert len(res) == 6000 or not test, f"In test mode and res is not of correct length, found {len(res)}."
 
     return res, res
 

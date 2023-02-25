@@ -12,19 +12,22 @@ from torchmetrics.image.inception import InceptionScore
 from rampwf.score_types.base import BaseScoreType
 from PIL import Image
 
+import gc
+
 import warnings
 
 
-def disable_kid_warnings():
+def disable_torchmetrics_warnings():
     """This function disables the warnings due to initializing KernelInceptionDistance objects from torchmetrics.image.kid.
     """
     warnings.resetwarnings()
+    warnings.filterwarnings('ignore')  # Ignore everything
     # ignore everything does not work: ignore specific messages, using regex
     warnings.filterwarnings(
         'ignore', '.*UserWarning: Metric `Kernel Inception Distance`*')
 
 
-disable_kid_warnings()
+disable_torchmetrics_warnings()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -227,6 +230,11 @@ class Master():
         is_mean, is_std = is_.compute()
         self.score[("IS_mean", current_fold)] = is_mean.item()*1000
         self.score[("IS_std", current_fold)] = is_std.item()*1000
+
+        # Delete models to make some space on the GPU.
+        del fid, kid, is_
+        torch.cuda.empty_cache()
+        gc.collect()
 
         return self.score[context]
 

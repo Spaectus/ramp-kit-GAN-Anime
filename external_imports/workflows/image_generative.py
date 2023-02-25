@@ -72,7 +72,7 @@ class ImageGenerative():
         assert len(folders) == 1, f"They are not exactly one folder ({len(folders)}) {folders=}"
         folder = tuple(folders)[0]
         print(f"Train on {folder=}")
-        images_names = [str(path.absolute()) for path in (Path("data") / folder).glob("*.jpg")]
+        images_names = [str(path.absolute()) for path in selected_images]
 
         g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder,
                                            n_jobs=self.n_jobs_batch_generator)
@@ -219,6 +219,7 @@ class BatchGeneratorBuilderNoValidNy():
                 # 2) Yielding mini-batches
                 for i in range(0, len(X), batch_size):
                     yield X[i:i + batch_size]
+            break
 
 
 def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
