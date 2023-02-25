@@ -1,6 +1,7 @@
 import torchvision
 import numpy as np
 
+
 class Generator():
     """
     This a cheater generator that returns samples from the training dataset.
@@ -8,7 +9,7 @@ class Generator():
 
     def __init__(self, latent_space_dimension):
         """Initializes a Generator object that is used for `ramp` training and evaluation.
-        
+
         This object is used to wrap your generator model and anything else required to train it and
         to generate samples.
 
@@ -32,7 +33,8 @@ class Generator():
             batchGeneratorBuilderNoValidNy (_type_): _description_
         """
 
-        generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(batch_size=100)
+        generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(
+            batch_size=100)
         memory = []
         size = 0
         while size < self.max_samples:
@@ -43,7 +45,7 @@ class Generator():
             taken = min(self.max_samples - size, size_batch)
             memory.append(batch[:taken].copy())
             size += size_batch
-        self.memory = np.concatenate(memory, axis=0)  # grab the first mini-batch of images. We can't memorize too many images.
+        self.memory = np.concatenate(memory, axis=0)
         assert isinstance(self.memory, np.ndarray)
 
     def generate(self, latent_space_noise):
@@ -59,13 +61,9 @@ class Generator():
         """
         nb_image = latent_space_noise.shape[0]
 
-        # assert len(
-        #     self.memory) >= nb_image, f"We do not saved enough images ! We saved {len(self.memory)} but we need {nb_image}"
-
         assert isinstance(self.memory, np.ndarray)
         memory_size = self.memory.shape[0]
         idx = np.arange(memory_size)
 
         chosen_idx = self.rng.choice(idx, size=nb_image, replace=True)
         return self.memory[chosen_idx, :, :, :]
-

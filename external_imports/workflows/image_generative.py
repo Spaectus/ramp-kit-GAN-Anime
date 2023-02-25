@@ -15,9 +15,13 @@ class ImageGenerative():
     Inspired from https://github.com/paris-saclay-cds/ramp-workflow/blob/master/rampwf/workflows/image_classifier.py
     """
 
-    def __init__(self, workflow_element_names=['generator'], n_images_generated: int = 100,
-                 latent_space_dimension: int = 1024, y_pred_batch_size: int = 64, chunk_size_feeder: int = 128,
-                 seed: int = 23, channels: int = 3, width: int = 64, height: int = 64,
+    def __init__(self, workflow_element_names=['generator'],
+                 n_images_generated: int = 100,
+                 latent_space_dimension: int = 1024,
+                 y_pred_batch_size: int = 64,
+                 chunk_size_feeder: int = 128,
+                 seed: int = 23,
+                 channels: int = 3, width: int = 64, height: int = 64,
                  n_jobs_batch_generator: int = -1):
         """
 

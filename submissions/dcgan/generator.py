@@ -25,11 +25,13 @@ class GeneratorGAN(nn.Module):
             nn.BatchNorm2d(features * 8),
             nn.ReLU(True),
 
-            nn.ConvTranspose2d(features * 8, features * 4, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(features * 8, features *
+                               4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(features * 4),
             nn.ReLU(True),
 
-            nn.ConvTranspose2d(features * 4, features * 2, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(features * 4, features *
+                               2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(features * 2),
             nn.ReLU(True),
 
@@ -39,7 +41,7 @@ class GeneratorGAN(nn.Module):
 
             nn.ConvTranspose2d(features, channels, 4, 2, 1, bias=False),
             nn.Tanh()
-      )
+        )
 
     def forward(self, x):
         return self.body(x)
@@ -71,6 +73,7 @@ class DiscriminatorGAN(nn.Module):
     def forward(self, x):
         return self.body(x)
 
+
 class Generator():
     """
     This is a DCGAN, implemented by François.
@@ -78,7 +81,7 @@ class Generator():
 
     def __init__(self, latent_space_dimension):
         """Initializes a Generator object that is used for `ramp` training and evaluation.
-        
+
         This object is used to wrap your generator model and anything else required to train it and
         to generate samples.
 
@@ -104,8 +107,10 @@ class Generator():
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         # Models
-        self.generator = GeneratorGAN(self.channels, self.latent_space_dimension, self.g_features).to(self.device)
-        self.discriminator = DiscriminatorGAN(self.channels, self.d_features).to(self.device)
+        self.generator = GeneratorGAN(
+            self.channels, self.latent_space_dimension, self.g_features).to(self.device)
+        self.discriminator = DiscriminatorGAN(
+            self.channels, self.d_features).to(self.device)
 
         # convention for labels
         self.real_label = 1.
@@ -113,8 +118,10 @@ class Generator():
 
         # Optimizers
         self.criterion = nn.BCELoss()
-        self.optimizer_g = optim.Adam(self.generator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        self.optimizer_d = optim.Adam(self.discriminator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.optimizer_g = optim.Adam(
+            self.generator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.optimizer_d = optim.Adam(
+            self.discriminator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
 
     # def fit(self, image_folder: torchvision.datasets.ImageFolder):
     def fit(self, batchGeneratorBuilderNoValidNy):
@@ -130,12 +137,20 @@ class Generator():
 
         # Load pretrained model
         PATH = Path(__file__).parent / "models"
-        self.generator.load_state_dict(torch.load(PATH / "generator_19900.pth"))
-        self.discriminator.load_state_dict(torch.load(PATH / "discriminator_19900.pth"))
+        self.generator.load_state_dict(
+            torch.load(PATH / "generator_19900.pth"))
+        self.discriminator.load_state_dict(
+            torch.load(PATH / "discriminator_19900.pth"))
+        
+        self.discriminator.to(self.device)
+        
+        self.generator.train()
+        self.discriminator.train()
 
         for epoch in tqdm(np.arange(1, self.epochs + 1)):
             self.discriminator.to(self.device)
-            generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(batch_size=self.batch_size)
+            generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(
+                batch_size=self.batch_size)
             # nb_batches = total_nb_images // self.batch_size + 1 * (total_nb_images % self.batch_size !=0)
             # print(f"Epoch {epoch} of {self.epochs}.")
             # print("Total number of imgs :", total_nb_images)
@@ -156,13 +171,15 @@ class Generator():
                 self.discriminator.zero_grad()
                 real_img = batch.to(self.device)
                 batch_size = real_img.size(0)
-                label = torch.full((batch_size,), self.real_label, dtype=torch.float, device=self.device)
+                label = torch.full((batch_size,), self.real_label,
+                                   dtype=torch.float, device=self.device)
                 real_out = self.discriminator(real_img).view(-1)
                 loss_real = self.criterion(real_out, label)
                 loss_real.backward()
 
                 # all-fake batch
-                noise = torch.randn(batch_size, self.latent_space_dimension, 1, 1, device=self.device)
+                noise = torch.randn(
+                    batch_size, self.latent_space_dimension, 1, 1, device=self.device)
                 fake = self.generator(noise)
                 label.fill_(self.fake_label)
                 fake_out = self.discriminator(fake.detach()).view(-1)
@@ -177,7 +194,8 @@ class Generator():
 
                 # (2) update the generator: maximize log(D(G(z)))
                 self.generator.zero_grad()
-                label.fill_(self.real_label)  # fake labels are real for generator cost
+                # fake labels are real for generator cost
+                label.fill_(self.real_label)
                 fake_out = self.discriminator(fake).view(-1)
                 loss_g = self.criterion(fake_out, label)
                 loss_g.backward()
@@ -207,12 +225,17 @@ class Generator():
         """
         # nb_image = latent_space_noise.shape[0]
 
+        self.generator.eval()
+        self.discriminator.eval()
+
+
         # In order to save space on the GPU, we send the discriminator back to the CPU.
         self.discriminator.to("cpu")
 
         with torch.no_grad():
             # We take a noise of size [nb_image, latent_size, 1, 1] for our generator.
-            truncated_noise = torch.Tensor(latent_space_noise[:, :self.latent_space_dimension, np.newaxis, np.newaxis]).to(self.device)
+            truncated_noise = torch.Tensor(
+                latent_space_noise[:, :self.latent_space_dimension, np.newaxis, np.newaxis]).to(self.device)
             batch = self.generator(truncated_noise)
-        
+
         return batch.numpy(force=True)

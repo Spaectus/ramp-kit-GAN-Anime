@@ -100,6 +100,7 @@ class Master():
     This class centralizes the computations of the metrics, which are then retrieved by the BaseScoreType objects of
     `ramp-workflow`.
     """
+
     def __init__(self, n_fold=3):
         """Initializes a Master object to centralize the computation of metrics.
 
@@ -114,12 +115,12 @@ class Master():
         self.batch_size = 32
         self.score = {}
         # [None, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3]
-        self.pattern = [
-            None] + [i for i in range(n_fold) for z in range(3)] + 50 * [n_fold]  # 6
+        self.pattern = [None] + \
+            [i for i in range(n_fold) for z in range(3)] + 50 * [n_fold]  # 6
         self.memory_call = Counter()
         self.memory = Counter()
         self.n_fold = n_fold
-        
+
         # Permanent metrics to compute bagged scores
         self.fid = FrechetInceptionDistance(
             reset_real_features=True, normalize=True).to(device)
@@ -146,7 +147,7 @@ class Master():
         Returns:
             float: The value of the metric to compute for the current fold.
         """
-        
+
         assert metric in ("FID", "KID_mean", "KID_std", "IS_mean", "IS_std")
         self.memory_call[metric] += 1
         # retrieve position in k_fold
@@ -193,16 +194,16 @@ class Master():
             batch_ = torch.Tensor(batch).to(device)
 
             if i == 0:
-                self.displayed = vutils.make_grid(batch_, padding=2, normalize=True).cpu()
+                self.displayed = vutils.make_grid(
+                    batch_, padding=2, normalize=True).cpu()
                 if not self.displayed is None:
                     plt.figure(figsize=(8, 8))
                     plt.axis("off")
                     plt.title("Generated Images")
-                    plt.imshow(np.transpose(self.displayed, (1,2,0)))
-                    print("The first batch of images is displayed on a different window. Please close it to continue evaluation.")
+                    plt.imshow(np.transpose(self.displayed, (1, 2, 0)))
+                    print(
+                        "The first batch of images is displayed on a different window. Please close it to continue evaluation.")
                     plt.show()
-
-
 
             fid.update(batch_, real=False)
             kid.update(batch_, real=False)
@@ -210,8 +211,6 @@ class Master():
             self.fid.update(batch_, real=False)
             self.kid.update(batch_, real=False)
             self.is_.update(batch_)
-
-
 
         if i == -1:
             # assert self.memory[metric] == 2
@@ -264,6 +263,7 @@ class Master():
 MASTER = Master()
 
 # Fréchet Inception Distance (FID)
+
 
 class FID(BaseScoreType):
     precision = 1
