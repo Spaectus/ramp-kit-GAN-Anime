@@ -105,14 +105,12 @@ def _read_data(path, str_: str):
     res = tuple()
     for train_folder in train_folders:
         if test:
-            # for the "quick-test" mode, use less data, only 2000 images per fold
+            # for the "quick-test" mode, use less data, not all images available per fold
             res += tuple(rng.choice(tuple(train_folder.glob("*.jpg")),
                          size=5000, replace=False))
         else:
             # otherwise we use all the data available
             res += tuple(train_folder.glob("*.jpg"))
-        
-    # assert len(res) == 6000 or not test, f"In test mode and res is not of correct length, found {len(res)}."
 
     return res, res
 

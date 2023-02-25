@@ -1,5 +1,5 @@
-import torchvision
 import numpy as np
+
 
 class Generator():
     """
@@ -19,13 +19,13 @@ class Generator():
         """
         self.rng = np.random.RandomState(seed=0)
 
-    def fit(self, batchGeneratorBuilderNoValidNy):
+    def fit(self, batchGeneratorBuilder):
         """Trains the generator with a batch generator builder, which can return a Python Generator with its method `get_train_generators`.
 
         In this submission, this method does nothing.
 
         Args:
-            batchGeneratorBuilderNoValidNy (_type_): _description_
+            batchGeneratorBuilder (_type_): _description_
         """
         pass
 
@@ -40,8 +40,8 @@ class Generator():
         """
         nb_image = latent_space_noise.shape[0]
         # Generate random samples
-        
+
         res = np.abs(self.rng.randn(nb_image, 3, 64, 64))
-        res = res/res.max()
+        res = res / res.max()
 
         return res

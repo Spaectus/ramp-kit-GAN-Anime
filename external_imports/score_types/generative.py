@@ -115,8 +115,7 @@ class Master():
         self.batch_size = 32
         self.score = {}
         # [None, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3]
-        self.pattern = [None] + \
-            [i for i in range(n_fold) for z in range(3)] + 50 * [n_fold]  # 6
+        self.pattern = [None] + [i for i in range(n_fold) for z in range(3)] + 2 * n_fold * [n_fold]  # 6
         self.memory_call = Counter()
         self.memory = Counter()
         self.n_fold = n_fold
@@ -127,9 +126,6 @@ class Master():
         self.kid = KernelInceptionDistance(
             reset_real_features=True, normalize=True).to(device)
         self.is_ = InceptionScore(normalize=True).to(device)
-
-        # For plotting
-        self.displayed = None
 
     def eval(self, y_true, y_pred, metric):
         """Evaluates scores for a given metric on a certain fold.
@@ -167,12 +163,12 @@ class Master():
 
             kid_mean, kid_std = self.kid.compute()
             # We rescale the KID scores because otherwise they are too small and too close to 0.
-            self.score[("KID_mean", current_fold)] = kid_mean.item()*1000
-            self.score[("KID_std", current_fold)] = kid_std.item()*1000
+            self.score[("KID_mean", current_fold)] = kid_mean.item() * 1000
+            self.score[("KID_std", current_fold)] = kid_std.item() * 1000
 
             is_mean, is_std = self.is_.compute()
-            self.score[("IS_mean", current_fold)] = is_mean.item()*1000
-            self.score[("IS_std", current_fold)] = is_std.item()*1000
+            self.score[("IS_mean", current_fold)] = is_mean.item() * 1000
+            self.score[("IS_std", current_fold)] = is_std.item() * 1000
 
             return self.score[context]
 
@@ -194,13 +190,13 @@ class Master():
             batch_ = torch.Tensor(batch).to(device)
 
             if i == 0:
-                self.displayed = vutils.make_grid(
+                displayed = vutils.make_grid(
                     batch_, padding=2, normalize=True).cpu()
-                if not self.displayed is None:
+                if displayed is not None:
                     plt.figure(figsize=(8, 8))
                     plt.axis("off")
                     plt.title("Generated Images")
-                    plt.imshow(np.transpose(self.displayed, (1, 2, 0)))
+                    plt.imshow(np.transpose(displayed, (1, 2, 0)))
                     print(
                         "The first batch of images is displayed on a different window. Please close it to continue evaluation.")
                     plt.show()
@@ -221,7 +217,7 @@ class Master():
         folders = set(path_.parent.name for path_ in y_true)
         assert len(folders) == 3
         y_true_ = tuple(
-            path for path in y_true if path.parent.name == f"train_{current_fold+1}")
+            path for path in y_true if path.parent.name == f"train_{current_fold + 1}")
 
         dataset = ImageSet(
             paths=y_true_,
@@ -245,12 +241,12 @@ class Master():
 
         kid_mean, kid_std = kid.compute()
         # We rescale the KID scores because otherwise they are too small and too close to 0.
-        self.score[("KID_mean", current_fold)] = kid_mean.item()*1000
-        self.score[("KID_std", current_fold)] = kid_std.item()*1000
+        self.score[("KID_mean", current_fold)] = kid_mean.item() * 1000
+        self.score[("KID_std", current_fold)] = kid_std.item() * 1000
 
         is_mean, is_std = is_.compute()
-        self.score[("IS_mean", current_fold)] = is_mean.item()*1000
-        self.score[("IS_std", current_fold)] = is_std.item()*1000
+        self.score[("IS_mean", current_fold)] = is_mean.item() * 1000
+        self.score[("IS_std", current_fold)] = is_std.item() * 1000
 
         # Delete models to make some space on the GPU.
         del fid, kid, is_
@@ -261,6 +257,7 @@ class Master():
 
 
 MASTER = Master()
+
 
 # Fréchet Inception Distance (FID)
 

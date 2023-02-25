@@ -1,4 +1,3 @@
-import torchvision
 import numpy as np
 
 
@@ -38,8 +37,9 @@ class Generator():
         memory = []
         size = 0
         while size < self.max_samples:
-            batch = next(generator_of_images)
-            if batch is None:
+            try:
+                batch = next(generator_of_images)
+            except StopIteration:
                 break
             size_batch = batch.shape[0]
             taken = min(self.max_samples - size, size_batch)
