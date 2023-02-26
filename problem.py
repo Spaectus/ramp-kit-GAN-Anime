@@ -5,7 +5,6 @@ import torch
 
 import numpy as np
 
-
 from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
 
@@ -26,7 +25,7 @@ p = channels * height * width
 # n_images_generated : the number of images that we ask the ramp competitor to generate per fold
 workflow = ImageGenerative(n_images_generated=3000, latent_space_dimension=1024, y_pred_batch_size=128,
                            chunk_size_feeder=64, seed=23, channels=channels, width=width, height=height,
-                           n_jobs_batch_generator=-1)
+                           n_jobs_batch_generator=-1, n_points_interpolate=150)
 
 # -----------------------------------------------------------------------------
 # Predictions type
@@ -109,7 +108,7 @@ def _read_data(path, str_: str):
         if test:
             # for the "quick-test" mode, use less data, not all images available per fold
             res += tuple(rng.choice(tuple(train_folder.glob("*.jpg")),
-                         size=5000, replace=False))
+                                    size=5000, replace=False))
         else:
             # otherwise we use all the data available
             res += tuple(train_folder.glob("*.jpg"))
