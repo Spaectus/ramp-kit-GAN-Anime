@@ -128,7 +128,7 @@ class Generator():
         self.g_features = 64
         self.d_features = 64
 
-        self.epochs = 5
+        self.epochs = 1
         self.lr = 2e-4
         self.beta1 = 0.5
 
