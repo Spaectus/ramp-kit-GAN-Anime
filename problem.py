@@ -10,7 +10,7 @@ from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
 
 from prediction_types.generative import make_generative_img
-from score_types.generative import KIDMean, KIDStd, FID, ISMean, ISStd
+from score_types.generative import KIDMean, KIDStd, FID, ISMean, ISStd, L1_norm
 
 problem_title = "Anime faces"
 
