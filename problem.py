@@ -10,7 +10,7 @@ from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
 
 from prediction_types.generative import make_generative_img
-from score_types.generative import KIDMean, KIDStd, FID, ISMean, ISStd, L1_norm
+from score_types.generative import KIDMean, KIDStd, FID, ISMean, ISStd, L1_norm, Mixed
 
 problem_title = "Anime faces"
 
@@ -49,7 +49,8 @@ score_types = [
     KIDStd(),
     ISMean(),
     ISStd(),
-    L1_norm()
+    L1_norm(),
+    Mixed(alpha=1000, beta=1, gamma=1, delta=10)
 ]
 
 
