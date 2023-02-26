@@ -11,10 +11,34 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm import tqdm
 
+import urllib.request
 from pathlib import Path
+import zipfile
 
 seed = 0
 torch.manual_seed(seed)
+
+
+def download_pretrained_weights():
+    DIR = Path(__file__).parent / "models"
+    DIR.mkdir(exist_ok=True)
+
+    DIR_DISC = DIR / "discriminator_19900.pth"
+    DIR_GEN = DIR / "generator_19900.pth"
+
+    if DIR_DISC.exists() and DIR_GEN.exists():
+        return
+    print("Did not find pretrained weights in the directory. Starting download.")
+    tmp_filename = "weights_50_epochs.zip"
+
+    url = "https://drive.rezel.net/s/8dirwK3DLySeqz5/download/weights_50_epochs.zip"
+
+    urllib.request.urlretrieve(url, tmp_filename)
+    with zipfile.ZipFile(tmp_filename, 'r') as zip_ref:
+        zip_ref.extractall(DIR)
+
+    Path(tmp_filename).unlink()
+    print("Finished downloading.")
 
 
 class GeneratorGAN(nn.Module):
@@ -122,6 +146,8 @@ class Generator():
             self.generator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.optimizer_d = optim.Adam(
             self.discriminator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        
+        download_pretrained_weights()
 
     # def fit(self, image_folder: torchvision.datasets.ImageFolder):
     def fit(self, batchGeneratorBuilderNoValidNy):
@@ -141,9 +167,9 @@ class Generator():
             torch.load(PATH / "generator_19900.pth"))
         self.discriminator.load_state_dict(
             torch.load(PATH / "discriminator_19900.pth"))
-        
+
         self.discriminator.to(self.device)
-        
+
         self.generator.train()
         self.discriminator.train()
 
@@ -227,7 +253,6 @@ class Generator():
 
         self.generator.eval()
         self.discriminator.eval()
-
 
         # In order to save space on the GPU, we send the discriminator back to the CPU.
         self.discriminator.to("cpu")
