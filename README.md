@@ -40,9 +40,10 @@ mixed_score = (a * IS_mean + b * FID + c * KID_mean)/(1 + d * L1_norm_interpolat
 ```
 
 We just resolved a linear equation such that :
-- a random generator (gaussian noise) has a mixed score of 1
 - a cheater generator has a mixed score of 1
+- a random generator (gaussian noise) has a mixed score of 1
+- `b` and `c` are negative
 
 ![img/linear-equations.png](img/linear-equations.png)
 
-We then choos `b=-2`
+We then choose `b=-2`
