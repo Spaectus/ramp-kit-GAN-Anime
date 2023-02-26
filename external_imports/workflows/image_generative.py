@@ -2,10 +2,18 @@ import collections
 import os
 from pathlib import Path
 from typing import List
+import itertools
 
 from rampwf.utils.importing import import_module_from_source
 
 import numpy as np
+
+
+def pairwise(iterable):
+    # pairwise('ABCDEFG') --> AB BC CD DE EF FG
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, b)
 
 
 class ImageGenerative():
@@ -29,9 +37,10 @@ class ImageGenerative():
                  chunk_size_feeder: int = 128,
                  seed: int = 23,
                  channels: int = 3, width: int = 64, height: int = 64,
-                 n_jobs_batch_generator: int = -1):
+                 n_jobs_batch_generator: int = -1, n_points_interpolate: int = 150):
         """
 
+        :param n_points_interpolate: number of point on which we do the interpolation
         :param n_jobs_batch_generator: Number of workers converting dataset images on disk into numpy matrix.
         :param seed: integer value for reproductible results
         :param y_pred_batch_size: The generated images are not all in memory at the same time, they are put in batch.
@@ -51,6 +60,7 @@ class ImageGenerative():
         self.chunk_size_feeder: int = chunk_size_feeder
         self.seed = seed
         self.n_jobs_batch_generator = n_jobs_batch_generator
+        self.n_points_interpolate = n_points_interpolate
 
         self.rng = np.random.default_rng(seed=self.seed)
 
@@ -96,6 +106,25 @@ class ImageGenerative():
 
         return generator
 
+    def check_generator_result(self, res_numpy, batch_size):
+        if not isinstance(res_numpy, np.ndarray):
+            raise ValueError(f"Output of generate function must be a np.ndarray, {type(res_numpy)} found")
+        if len(res_numpy.shape) != 4:
+            raise ValueError(
+                f"Output of the generate function must be a np.ndarray with exactly {4} dimensions, {len(res_numpy.shape)} found")
+        if res_numpy.shape[0] != batch_size:
+            raise ValueError(
+                f"The first dimension of the np.array returned by the generate function must be {batch_size} in this case, found {res_numpy.shape[0]}")
+        if res_numpy.shape[1:] != (self.channels, self.height, self.width):
+            raise ValueError(
+                f"Output of the generate function must have shape {(batch_size, self.channels, self.height, self.width)}, found {res_numpy.shape}")
+        if np.isnan(res_numpy).any():
+            raise ValueError(
+                f"Output of the generate function must be a np.ndarray without nan, {np.isnan(res_numpy).sum()} nan found")
+        if np.isinf(res_numpy).any():
+            raise ValueError(
+                f"Output of the generate function must be a np.ndarray without inf, {np.isinf(res_numpy).sum()} inf found")
+
     def test_submission(self, trained_model, X_array):
         """
         This function generates Gaussian noise and gives it to the generator of the submission to recover images.
@@ -117,24 +146,25 @@ class ImageGenerative():
                 batch_size = upper - i
                 # Gaussian noise is generated for the latent space for the batch and given to the generator
                 res_numpy = generator.generate(self.rng.normal(size=(batch_size, self.latent_space_dimension)))
-                if not isinstance(res_numpy, np.ndarray):
-                    raise ValueError(f"Output of generate function must be a np.ndarray, {type(res_numpy)} found")
-                if len(res_numpy.shape) != 4:
-                    raise ValueError(
-                        f"Output of the generate function must be a np.ndarray with exactly {4} dimensions, {len(res_numpy.shape)} found")
-                if res_numpy.shape[0] != batch_size:
-                    raise ValueError(
-                        f"The first dimension of the np.array returned by the generate function must be {batch_size} in this case, found {res_numpy.shape[0]}")
-                if res_numpy.shape[1:] != (self.channels, self.height, self.width):
-                    raise ValueError(
-                        f"Output of the generate function must have shape {(batch_size, self.channels, self.height, self.width)}, found {res_numpy.shape}")
-                if np.isnan(res_numpy).any():
-                    raise ValueError(
-                        f"Output of the generate function must be a np.ndarray without nan, {np.isnan(res_numpy).sum()} nan found")
-                if np.isinf(res_numpy).any():
-                    raise ValueError(
-                        f"Output of the generate function must be a np.ndarray without inf, {np.isinf(res_numpy).sum()} inf found")
+                self.check_generator_result(res_numpy, batch_size)
+                yield res_numpy
 
+            yield None  # indicate that we switch to interpolation
+            print("on gen interpolate now")
+            z1, z2 = self.rng.normal(size=(2, self.latent_space_dimension))
+            t_vec = np.linspace(0, 1, num=self.n_points_interpolate)
+
+            # let's create a batch with the segment t * z1 + (1-t) * z2
+            # segment_batch = np.array([t*z1 + (1-t) * z2 for t in t_vec])
+
+            for i in range(0, len(t_vec), self.y_pred_batch_size):
+                upper = min(i + self.y_pred_batch_size, self.n_points_interpolate)
+                batch_size = upper - i
+                # let's create a batch with the segment t * z1 + (1-t) * z2
+                current_segment_batch = np.array([t * z1 + (1 - t) * z2 for t in t_vec[i:upper]])
+                assert len(current_segment_batch) == batch_size, f"{current_segment_batch.shape=} and {batch_size=}"
+                res_numpy = generator.generate(current_segment_batch)
+                self.check_generator_result(res_numpy, batch_size)
                 yield res_numpy
 
         # Instead of directly returning the y_pred_generator(). We pass through the KnownLengthGenerator class.
@@ -206,7 +236,6 @@ class BatchGeneratorBuilderNoValidNy():
             # Yielding mini-batches
             for i in range(0, len(X), batch_size):
                 yield X[i:i + batch_size]
-
 
 
 def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):

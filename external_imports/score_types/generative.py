@@ -1,4 +1,5 @@
 from collections import Counter
+import itertools
 
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import Compose, ToTensor
@@ -19,6 +20,12 @@ import gc
 
 import warnings
 
+
+def pairwise(iterable):
+    # pairwise('ABCDEFG') --> AB BC CD DE EF FG
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, b)
 
 def disable_torchmetrics_warnings():
     """This function disables the warnings due to initializing KernelInceptionDistance objects from torchmetrics.image.kid.
@@ -172,10 +179,6 @@ class Master():
 
             return self.score[context]
 
-        if len(y_true) == 0:
-            # assert self.memory[metric] == 3
-            # print(f"len(y_true) == 0 and {self.memory[context]=}")
-            return self.score[context]
 
         fid = FrechetInceptionDistance(
             reset_real_features=True, normalize=True).to(device)
@@ -183,13 +186,17 @@ class Master():
             reset_real_features=True, normalize=True).to(device)
         is_ = InceptionScore(normalize=True).to(device)
 
-        i = -1
         # Handling generated data
-        for i, batch in enumerate(y_pred):
+        itertaor_enumerated_batch = enumerate(y_pred)
+        for i, batch in itertaor_enumerated_batch:
+            if batch is None:
+                # A None batch indicates that the next batch if for the interpolate test
+                print(f"batch is now None, break")
+                break
 
             batch_ = torch.Tensor(batch).to(device)
 
-            if i == 0:
+            if i == 0 and False:
                 displayed = vutils.make_grid(
                     batch_, padding=2, normalize=True).cpu()
                 if displayed is not None:
@@ -200,6 +207,7 @@ class Master():
                     print(
                         "The first batch of images is displayed on a different window. Please close it to continue evaluation.")
                     plt.show()
+                    print("closed")
 
             fid.update(batch_, real=False)
             kid.update(batch_, real=False)
@@ -208,10 +216,8 @@ class Master():
             self.kid.update(batch_, real=False)
             self.is_.update(batch_)
 
-        if i == -1:
-            # assert self.memory[metric] == 2
-            # print(f"i==-1 and {self.memory[context]=}")
-            return self.score[context]
+        # Now wa have to calculate the interpolation score
+        self.score[("L1_norm_interpolation", current_fold)] = self.do_interpolation(itertaor_enumerated_batch)
 
         # Handling true data
         folders = set(path_.parent.name for path_ in y_true)
@@ -255,6 +261,47 @@ class Master():
 
         return self.score[context]
 
+    def do_interpolation(self, remaining_y_pred):
+        from sklearn.metrics import adjusted_mutual_info_score
+        scores = []
+
+        display_iterpolation = True # display with matplotlib the interpolation images
+
+        images = []
+
+        previous_img = None
+
+        for i, interpolate_batch in remaining_y_pred:
+            if previous_img is not None:
+                # we add
+                iterator = pairwise(np.concatenate((np.expand_dims(previous_img, axis=0), interpolate_batch), axis=0))
+            else:
+                # first iteration in this for loop
+                iterator = pairwise(interpolate_batch)
+            for j, (img_1, img_2) in enumerate(iterator):
+                #scores.append(adjusted_mutual_info_score(img_1.ravel(), img_2.ravel()))
+                scores.append(np.abs(img_1 - img_2).mean())
+                if display_iterpolation:
+                    images.append(img_1)
+                previous_img = img_2
+        scores = np.array(scores)
+        print(f"interpolate scores")
+        print(scores)
+        print(f"{scores.shape=}")
+
+        if display_iterpolation:
+            displayed = vutils.make_grid(
+                torch.Tensor(np.stack(images, axis=0)).to(device), padding=2, normalize=True).cpu()
+            plt.figure(figsize=(8, 8))
+            plt.axis("off")
+            plt.title("Generated Images")
+            plt.imshow(np.transpose(displayed, (1, 2, 0)))
+            print(
+                "The first batch of images is displayed on a different window. Please close it to continue evaluation.")
+            plt.show()
+            print("closed")
+
+        return scores.max()
 
 MASTER = Master()
 
@@ -334,3 +381,16 @@ class ISStd(BaseScoreType):
     def __call__(self, y_true, y_pred):
         assert isinstance(y_true, tuple)
         return MASTER.eval(y_true, y_pred, metric="IS_std")
+
+class L1_norm(BaseScoreType):
+    precision = 1
+
+    def __init__(self, name="L1_norm_interpolation"):
+        self.name = name
+
+    def check_y_pred_dimensions(self, y_true, y_pred):
+        pass
+
+    def __call__(self, y_true, y_pred):
+        assert isinstance(y_true, tuple)
+        return MASTER.eval(y_true, y_pred, metric="L1_norm_interpolation")

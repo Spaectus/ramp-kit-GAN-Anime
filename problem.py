@@ -48,7 +48,8 @@ score_types = [
     KIDMean(),
     KIDStd(),
     ISMean(),
-    ISStd()
+    ISStd(),
+    L1_norm()
 ]
 
 
