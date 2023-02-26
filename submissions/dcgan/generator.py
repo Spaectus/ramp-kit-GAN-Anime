@@ -20,6 +20,10 @@ torch.manual_seed(seed)
 
 
 def download_pretrained_weights():
+    """This function downloads the weights of our pre-trained DCGAN over 50 epochs.
+
+    This submission fine-tunes our model that was already pre-trained on many images.
+    """
     DIR = Path(__file__).parent / "models"
     DIR.mkdir(exist_ok=True)
 
