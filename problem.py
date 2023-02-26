@@ -49,7 +49,7 @@ score_types = [
     ISMean(),
     ISStd(),
     L1_norm(),
-    Mixed(alpha=1000, beta=1, gamma=1, delta=10)
+    Mixed(alpha=1000, beta=-2, gamma=-212.91, delta=20.15042)
 ]
 
 

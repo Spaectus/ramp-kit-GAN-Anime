@@ -288,10 +288,6 @@ class Master():
                 # first iteration in this for loop
                 iterator = pairwise(interpolate_batch)
             for j, (img_1, img_2) in enumerate(iterator):
-<<<<<<< HEAD
-=======
-                # scores.append(adjusted_mutual_info_score(img_1.ravel(), img_2.ravel()))
->>>>>>> d5837a737b799764fbdb1fab620ff8be547121df
                 scores.append(np.abs(img_1 - img_2).mean())
                 if display_iterpolation:
                     images.append(img_1)
