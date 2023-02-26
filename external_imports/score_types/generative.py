@@ -27,6 +27,7 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, b)
 
+
 def disable_torchmetrics_warnings():
     """This function disables the warnings due to initializing KernelInceptionDistance objects from torchmetrics.image.kid.
     """
@@ -179,7 +180,6 @@ class Master():
 
             return self.score[context]
 
-
         fid = FrechetInceptionDistance(
             reset_real_features=True, normalize=True).to(device)
         kid = KernelInceptionDistance(
@@ -265,7 +265,7 @@ class Master():
         from sklearn.metrics import adjusted_mutual_info_score
         scores = []
 
-        display_iterpolation = True # display with matplotlib the interpolation images
+        display_iterpolation = True  # display with matplotlib the interpolation images
 
         images = []
 
@@ -279,7 +279,7 @@ class Master():
                 # first iteration in this for loop
                 iterator = pairwise(interpolate_batch)
             for j, (img_1, img_2) in enumerate(iterator):
-                #scores.append(adjusted_mutual_info_score(img_1.ravel(), img_2.ravel()))
+                # scores.append(adjusted_mutual_info_score(img_1.ravel(), img_2.ravel()))
                 scores.append(np.abs(img_1 - img_2).mean())
                 if display_iterpolation:
                     images.append(img_1)
@@ -302,6 +302,7 @@ class Master():
             print("closed")
 
         return scores.max()
+
 
 MASTER = Master()
 
@@ -381,6 +382,7 @@ class ISStd(BaseScoreType):
     def __call__(self, y_true, y_pred):
         assert isinstance(y_true, tuple)
         return MASTER.eval(y_true, y_pred, metric="IS_std")
+
 
 class L1_norm(BaseScoreType):
     precision = 1
