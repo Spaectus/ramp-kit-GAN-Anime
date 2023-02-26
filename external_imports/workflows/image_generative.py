@@ -150,7 +150,6 @@ class ImageGenerative():
                 yield res_numpy
 
             yield None  # indicate that we switch to interpolation
-            print("on gen interpolate now")
             z1, z2 = self.rng.normal(size=(2, self.latent_space_dimension))
             t_vec = np.linspace(0, 1, num=self.n_points_interpolate)
 
