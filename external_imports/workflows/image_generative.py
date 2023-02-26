@@ -11,6 +11,13 @@ import numpy as np
 class ImageGenerative():
     """
 
+    Worflow for image generation challenge
+
+    the submissions must contain only one file "generative.py".
+    This file must contain a "Generator" class which must contain the following methods:
+    __init__(self, latent_space_dimension) : where latent_space_dimension is the dimension of the latent space
+    fit(self, batchGeneratorBuilder) : where batchGeneratorBuilder is an instance to retrieve batchs of images
+    generate(self, latent_space_noise) : where latent_space_noise is a noise matrix in the latent space
 
     Inspired from https://github.com/paris-saclay-cds/ramp-workflow/blob/master/rampwf/workflows/image_classifier.py
     """
@@ -25,8 +32,12 @@ class ImageGenerative():
                  n_jobs_batch_generator: int = -1):
         """
 
-        :param n_images_generated: umber of images generated to evaluate a generator
-        :param workflow_element_names:
+        :param n_jobs_batch_generator: Number of workers converting dataset images on disk into numpy matrix.
+        :param seed: integer value for reproductible results
+        :param y_pred_batch_size: The generated images are not all in memory at the same time, they are put in batch.
+        y_pred_batch_size is the size of these batch
+        :param n_images_generated: number of images generated to evaluate a generator
+        :param workflow_element_names: List of python file names contained in a submission
         :param latent_space_dimension: number of real numbers needed to describe a point in the latent space
         """
 
@@ -48,63 +59,62 @@ class ImageGenerative():
         module_path : str
             module where the submission is. the folder of the module
             have to contain generator.py.
-        X_array : ArrayContainer vector of int
-
-        y_array : vector of int
+        X_array : Tuple of dataset image paths
+        y_array : Tuple of dataset image paths
 
         train_is : vector of int
            indices from X_array to train on
         """
 
-        # Note : le type de X_df dépend du get_train_data in problem.py
-        assert isinstance(X_array, tuple)  # X_array : tuple de path
-        assert isinstance(y_array, tuple)  # tuple de path
+        assert isinstance(X_array, tuple)  # tuple of paths
+        assert isinstance(y_array, tuple)  # tuple of paths
 
         image_generator = import_module_from_source(
             os.path.join(module_path, self.elements_names[0] + ".py"),
             self.elements_names[0],
             sanitize=True
         )
-
+        # We instantiate the generator of the submission
         generator = image_generator.Generator(latent_space_dimension=self.latent_space_dimension)
 
-        # we retrieve selected images with indices provided by train_is
+        # we retrieve selected images (of the current fold) with indices provided by train_is
         selected_images: List = [X_array[indice] for indice in train_is]
 
         # We convert selected_images (list of path) to BatchGeneratorBuilderNoValidNy
         folders = set(path_.parent.name for path_ in selected_images)  # we retrieve folders required by the data
         assert len(folders) == 1, f"They are not exactly one folder ({len(folders)}) {folders=}"
         folder = tuple(folders)[0]
-        print(f"Train on {folder=}")
+
+        # print(f"Train on {folder=}")
         images_names = [str(path.absolute()) for path in selected_images]
 
         g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder,
                                            n_jobs=self.n_jobs_batch_generator)
 
+        # We train the generator of the submission
         generator.fit(g)
+
         return generator
 
     def test_submission(self, trained_model, X_array):
         """
+        This function generates Gaussian noise and gives it to the generator of the submission to recover images.
+        Test_submission doesn't return directly the images, but returns a python generator (on which we can make a for
+        loop for example) giving access to image batches of size self.y_pred_batch_size
+
 
         :param trained_model: object that is returned by train_submission, in our case the generator
-        :param X_array: object that is returned by get_test_data in problem.py
+        :param X_array: Tuple of dataset image paths
         :return: generated images from generator
         """
         assert isinstance(X_array, tuple)
 
-        generator = trained_model  # we retieve the model trained by the train_submission
+        generator = trained_model  # we retrieve the model trained by the train_submission
 
-        # Gaussian noise is generated for the latent space for the batch
-        #latent_space_noise = self.rng.normal(size=(self.n_images_generated, self.latent_space_dimension))
-
-        # return KnownLengthGenerator(generator.generate(latent_space_noise), self.n_images_generated)
-
-        def gen():
+        def y_pred_generator():
             for i in range(0, self.n_images_generated, self.y_pred_batch_size):
                 upper = min(i + self.y_pred_batch_size, self.n_images_generated)
                 batch_size = upper - i
-                #batch = latent_space_noise[i:upper]
                 # Gaussian noise is generated for the latent space for the batch and given to the generator
                 res_numpy = generator.generate(self.rng.normal(size=(batch_size, self.latent_space_dimension)))
                 if not isinstance(res_numpy, np.ndarray):
@@ -127,39 +137,33 @@ class ImageGenerative():
 
                 yield res_numpy
 
-        return KnownLengthGenerator(gen(), self.n_images_generated)
+        # Instead of directly returning the y_pred_generator(). We pass through the KnownLengthGenerator class.
+        # KnownLengthGenerator copies the generator behavior of y_pred_generator() perfectly. Because of internal
+        # checking in ramp, len(y_pred) must return something, but this cannot be the case if y_pred is simply the
+        # y_pred_generator(). With the line below, we set len(y_pred) = self.n_images_generated
+        return KnownLengthGenerator(y_pred_generator(), self.n_images_generated)
 
 
+# inspired from BatchGeneratorBuilder found here :
+# https://github.com/paris-saclay-cds/ramp-workflow/blob/master/rampwf/workflows/image_classifier.py
 class BatchGeneratorBuilderNoValidNy():
     """A batch generator builder for generating images on the fly.
-    This class is a way to build training and
-    validation generators that yield each time a tuple (X, y) of mini-batches.
-    The generators are built in a way to fit into keras API of `fit_generator`
-    (see https://keras.io/models/model/).
-    An instance of this class is exposed to users `Classifier` through
+    This class is a way to build training generators that yield each time a mini-batches of images.
+
+    An instance of this class is exposed to users through
     the `fit` function : model fitting is called by using
     "clf.fit(gen_builder)" where `gen_builder` is an instance
     of this class : `BatchGeneratorBuilder`.
-    The fit function from `Classifier` should then use the instance
-    to build train and validation generators, using the method
-    `get_train_valid_generators`
+    The fit function from `Generator` should then use the instance
+    to build train generators, using the method `get_train_valid_generators`
     Parameters
     ==========
-    X_array : ArrayContainer of int
-        vector of image IDs to train on
-         (it is named X_array to be coherent with the current API,
-         but as said here, it does not represent the data itself,
-         only image IDs).
+    X_array :
+        vector of path (in string) to images
     folder : str
         folder where the images are
     chunk_size : int
         size of the chunk used to load data from disk into memory.
-        (see at the top of the file what a chunk is and its difference
-         with the mini-batch size of neural nets).
-    n_classes : int
-        Total number of classes. This is needed because the array
-        of labels, which is a vector of ints, is transformed into
-        a onehot representation.
     n_jobs : int
         the number of jobs used to load images from disk to memory as `chunks`.
     """
@@ -179,17 +183,10 @@ class BatchGeneratorBuilderNoValidNy():
         ==========
         batch_size : int
             size of mini-batches
-        valid_ratio : float between 0 and 1
-            ratio of validation data
+
         Returns
         =======
-        a 4-tuple (gen_train, gen_valid, nb_train, nb_valid) where:
-            - gen_train is a generator function for training data
-            - gen_valid is a generator function for valid data
-            - nb_train is the number of training examples
-            - nb_valid is the number of validation examples
-        The number of training and validation data are necessary
-        so that we can use the keras method `fit_generator`.
+        gen_train, a generator function for training data
         """
         nb_train = self.nb_examples
         indices = np.arange(self.nb_examples)
@@ -201,40 +198,23 @@ class BatchGeneratorBuilderNoValidNy():
     def _get_generator(self, indices=None, batch_size=256):
         if indices is None:
             indices = np.arange(self.nb_examples)
-        # Infinite loop, as required by keras `fit_generator`.
-        # However, as we provide the number of examples per epoch
-        # and the user specifies the total number of epochs, it will
-        # be able to end.
-        while True:
-            it = _chunk_iterator(
-                X_array=self.X_array[indices], folder=self.folder,
-                n_jobs=self.n_jobs)
-            for X in it:
-                # 1) Preprocessing of X and y
-                # X = Parallel(
-                # n_jobs=self.n_jobs, backend='threading')(delayed(
-                #     self.transform_img)(x) for x in X)
 
+        it = _chunk_iterator(
+            X_array=self.X_array[indices], folder=self.folder,
+            n_jobs=self.n_jobs)
+        for X in it:
+            # Yielding mini-batches
+            for i in range(0, len(X), batch_size):
+                yield X[i:i + batch_size]
 
-                # X shape : b x 64 x 64 x 3
-                X = np.moveaxis(np.array(X), -1, 1)
-                # X shape : b x 3 x 64 x 64
-
-                # 2) Yielding mini-batches
-                for i in range(0, len(X), batch_size):
-                    yield X[i:i + batch_size]
-            break
 
 
 def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
-    """Generate chunks of images, optionally with their labels.
+    """Generate chunks of images.
     Parameters
     ==========
     X_array : ArrayContainer of int
-        image ids to load
-        (it is named X_array to be coherent with the current API,
-         but as said here, it does not represent the data itself,
-         only image IDs).
+        image names to load
     chunk_size : int
         chunk size
     folder : str
@@ -243,19 +223,9 @@ def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
         number of jobs used to load images in parallel
     Yields
     ======
-    if y_array is provided (not None):
-        it yields each time a tuple (X, y) where X is a list
-        of numpy arrays of images and y is a list of ints (labels).
-        The length of X and y is `chunk_size` at most (it can be smaller).
-    if y_array is not provided (it is None)
-        it yields each time X where X is a list of numpy arrays
-        of images. The length of X is `chunk_size` at most (it can be
-        smaller).
-        This is used for testing, where we don't have/need the labels.
-    The shape of each element of X in both cases
-    is (height, width, color), where color is 1 or 3 or 4 and height/width
-    vary according to examples (hence the fact that X is a list instead of
-    numpy array).
+
+    The shape of each element of X is (color, height, width), where color is 1 or 3 or 4 and height/width
+    do not vary among images.
     """
     from skimage.io import imread  # TODO
     from joblib import delayed
@@ -267,7 +237,7 @@ def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
             for x in X_chunk]
         X = Parallel(n_jobs=n_jobs, backend='threading')(delayed(imread)(
             filename) for filename in filenames)
-        yield X
+        yield np.moveaxis(X, -1, 1)  # from (height, width, color) to (color, height, width)
 
 
 class KnownLengthGenerator:
@@ -279,10 +249,7 @@ class KnownLengthGenerator:
         return self.length
 
     def __iter__(self):
-        from itertools import tee
-        original, new = tee(self.gen, 2)
-        yield from new
-        # yield from self.gen
+        yield from self.gen
 
     def __next__(self):
         print(f"Destruction of a generator !!")
