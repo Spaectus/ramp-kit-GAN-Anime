@@ -33,16 +33,16 @@ Go to the `ramp-workflow` [wiki](https://github.com/paris-saclay-cds/ramp-workfl
 
 ---
 
-## TODO
+### Mixed Score :
 
-### [`problem.py` file](https://paris-saclay-cds.github.io/ramp-docs/ramp-workflow/stable/problem.html#problem)
+```python
+mixed_score = (a * IS_mean + b * FID + c * KID_mean)/(1 + d * L1_norm_interpolation) 
+```
 
-- Implem custom [Prediction type](https://github.com/paris-saclay-cds/ramp-workflow/tree/master/rampwf/prediction_types)
-- Implem the [workflow](https://github.com/paris-saclay-cds/ramp-workflow/tree/master/rampwf/workflows)
-- Implem score metrics
-- specify cross-validation ?
-- get_train_data() and get_test_data() ?
+We just resolved a linear equation such that :
+- a random generator (gaussian noise) has a mixed score of 1
+- a cheater generator has a mixed score of 1
 
-### build submissions/starting_kit
+![img/linear-equations.png](img/linear-equations.png)
 
-- implem simple auto-encoder
+We then choos `b=-2`
