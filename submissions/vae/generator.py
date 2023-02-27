@@ -151,7 +151,7 @@ class VAE(nn.Module):
 
 
 class Generator():
-    def __init__(self, latent_space_dimension):
+    def __init__(self):
         seed = 0
         torch.manual_seed(seed)
         self.latent_space_dimension = 256
@@ -215,9 +215,8 @@ class Generator():
     def generate(self, latent_space_noise):
         self.VAE.eval()
         with torch.no_grad():
-            truncated_noise = torch.Tensor(
-                latent_space_noise[:, :self.latent_space_dimension]).to(self.device)
-            batch = self.VAE.decode(truncated_noise)
+            random_noise = torch.randn(latent_space_noise, self.latent_space_dimension, device=self.device)
+            batch = self.VAE.decode(random_noise)
 
         return batch.numpy(force=True)
 
