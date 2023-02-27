@@ -156,7 +156,7 @@ class Master():
         assert metric in ("FID", "KID_mean", "KID_std",
                           "IS_mean", "IS_std", "L1_norm_interpolation")
         self.memory_call[metric] += 1
-        # retrieve position in k_fold
+        # retrieve position in k_fold thanks to self.pattern
         current_fold: int = self.pattern[self.memory_call[metric]]
         self.current_fold = current_fold
 
@@ -199,7 +199,6 @@ class Master():
         for i, batch in itertaor_enumerated_batch:
             if batch is None:
                 # A None batch indicates that the next batch if for the interpolate test
-                # print(f"batch is now None, break")
                 break
 
             batch_ = torch.Tensor(batch).to(device)
@@ -223,9 +222,9 @@ class Master():
             self.kid.update(batch_, real=False)
             self.is_.update(batch_)
 
-        # Now wa have to calculate the interpolation score
+        # Now wa have to calculate the interpolation score with the remaining batchs
         self.score[("L1_norm_interpolation", current_fold)] = self.do_interpolation(
-            itertaor_enumerated_batch, tol=.1)
+            itertaor_enumerated_batch, tolerance=.1)
 
         # Handling true data
         folders = set(path_.parent.name for path_ in y_true)
@@ -269,7 +268,7 @@ class Master():
 
         return self.score[context]
 
-    def do_interpolation(self, remaining_y_pred, tol=.5):
+    def do_interpolation(self, remaining_y_pred, tolerance=.5):
 
         scores = []
 
@@ -281,7 +280,7 @@ class Master():
 
         for i, interpolate_batch in remaining_y_pred:
             if previous_img is not None:
-                # we add
+                # we add the last image of the last batch to the new batch
                 iterator = pairwise(np.concatenate(
                     (np.expand_dims(previous_img, axis=0), interpolate_batch), axis=0))
             else:
@@ -289,11 +288,12 @@ class Master():
                 iterator = pairwise(interpolate_batch)
             for j, (img_1, img_2) in enumerate(iterator):
                 scores.append(np.abs(img_1 - img_2).mean())
+                # If we want to display with matplotlib the interpolation images, we must store all of them
                 if display_iterpolation:
                     images.append(img_1)
                 previous_img = img_2
         scores = np.array(scores)
-        score = scores.max()
+        score = scores.max()  # The L1_norm_interplotation is the max
 
         if display_iterpolation:
             displayed = vutils.make_grid(
@@ -306,15 +306,13 @@ class Master():
                 "The interpolation test is displayed on a different window. Please close it to continue evaluation.")
             plt.show()
 
-        return np.maximum(score - tol, 0)
-
+        return np.maximum(score - tolerance, 0)
 
 
 MASTER = Master()
 
 
 # Fréchet Inception Distance (FID)
-
 
 class FID(BaseScoreType):
     precision = 5
@@ -442,4 +440,5 @@ class Mixed(BaseScoreType):
         interpolation_score = MASTER.score[(
             "L1_norm_interpolation", MASTER.current_fold)]
 
-        return np.maximum(0, self.alpha * is_mean + self.beta * fid + self.gamma * kid_mean)/(1 + self.delta * interpolation_score)
+        return np.maximum(0, self.alpha * is_mean + self.beta * fid + self.gamma * kid_mean) / (
+                1 + self.delta * interpolation_score)
