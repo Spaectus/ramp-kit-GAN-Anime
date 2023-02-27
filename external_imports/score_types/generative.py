@@ -225,7 +225,7 @@ class Master():
 
         # Now wa have to calculate the interpolation score
         self.score[("L1_norm_interpolation", current_fold)] = self.do_interpolation(
-            itertaor_enumerated_batch, tol=0)
+            itertaor_enumerated_batch, tol=.1)
 
         # Handling true data
         folders = set(path_.parent.name for path_ in y_true)
