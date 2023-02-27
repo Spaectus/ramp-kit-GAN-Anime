@@ -95,7 +95,6 @@ class ImageGenerative():
         assert len(folders) == 1, f"They are not exactly one folder ({len(folders)}) {folders=}"
         folder = tuple(folders)[0]
 
-        # print(f"Train on {folder=}")
         images_names = [str(path.absolute()) for path in selected_images]
 
         g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder,
@@ -107,6 +106,10 @@ class ImageGenerative():
         return generator
 
     def check_generator_result(self, res_numpy, batch_size):
+        """Checks that res_numy is a matrix of dimension according to what is expected in the output of the generate
+        function of generator.py
+        The expected dimension for res_numpy depends on batch_size, that's why it is in parameter of the function
+        """
         if not isinstance(res_numpy, np.ndarray):
             raise ValueError(f"Output of generate function must be a np.ndarray, {type(res_numpy)} found")
         if len(res_numpy.shape) != 4:
@@ -141,21 +144,29 @@ class ImageGenerative():
         generator = trained_model  # we retrieve the model trained by the train_submission
 
         def y_pred_generator():
+            # First we ask to generate images from gaussian noise
             for i in range(0, self.n_images_generated, self.y_pred_batch_size):
                 upper = min(i + self.y_pred_batch_size, self.n_images_generated)
                 batch_size = upper - i
                 # Gaussian noise is generated for the latent space for the batch and given to the generator
                 res_numpy = generator.generate(self.rng.normal(size=(batch_size, self.latent_space_dimension)))
+                # check that res_numpy is a matrix of the right size, etc.
                 self.check_generator_result(res_numpy, batch_size)
                 yield res_numpy
 
+            # Now we will ask to generate images from specific input in order to be able to compute the metric
+            # L1_norm_interpolation
+
             yield None  # indicate that we switch to interpolation
+
             z1, z2 = self.rng.normal(size=(2, self.latent_space_dimension))
             t_vec = np.linspace(0, 1, num=self.n_points_interpolate)
 
-            # let's create a batch with the segment t * z1 + (1-t) * z2
+            # let's create a batch with the segment t * z1 + (1-t) * z2 where t vary from 0 to 1
+            # this is done batch but in the end, to understand the code, we can say that :
             # segment_batch = np.array([t*z1 + (1-t) * z2 for t in t_vec])
 
+            # let's ask to generate images by batch
             for i in range(0, len(t_vec), self.y_pred_batch_size):
                 upper = min(i + self.y_pred_batch_size, self.n_points_interpolate)
                 batch_size = upper - i
@@ -163,10 +174,11 @@ class ImageGenerative():
                 current_segment_batch = np.array([t * z1 + (1 - t) * z2 for t in t_vec[i:upper]])
                 assert len(current_segment_batch) == batch_size, f"{current_segment_batch.shape=} and {batch_size=}"
                 res_numpy = generator.generate(current_segment_batch)
+                # check that res_numpy is a matrix of the right size, etc.
                 self.check_generator_result(res_numpy, batch_size)
                 yield res_numpy
 
-        # Instead of directly returning the y_pred_generator(). We pass through the KnownLengthGenerator class.
+        # Instead of directly returning the generator y_pred_generator(). We pass through the KnownLengthGenerator class
         # KnownLengthGenerator copies the generator behavior of y_pred_generator() perfectly. Because of internal
         # checking in ramp, len(y_pred) must return something, but this cannot be the case if y_pred is simply the
         # y_pred_generator(). With the line below, we set len(y_pred) = self.n_images_generated
@@ -182,9 +194,9 @@ class BatchGeneratorBuilderNoValidNy():
     An instance of this class is exposed to users through
     the `fit` function : model fitting is called by using
     "clf.fit(gen_builder)" where `gen_builder` is an instance
-    of this class : `BatchGeneratorBuilder`.
+    of this class : `BatchGeneratorBuilderNoValidNy`.
     The fit function from `Generator` should then use the instance
-    to build train generators, using the method `get_train_valid_generators`
+    to build train generators, using the method `get_train_generators`
     Parameters
     ==========
     X_array :
@@ -206,8 +218,7 @@ class BatchGeneratorBuilderNoValidNy():
 
     def get_train_generators(self, batch_size=256):
         """Build train and valid generators for keras.
-        This method is used by the user defined `Classifier` to o build train
-        and valid generators that will be used in keras `fit_generator`.
+        This method is used by the user defined `Generator` to build train generators.
         Parameters
         ==========
         batch_size : int
@@ -251,11 +262,10 @@ def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
         number of jobs used to load images in parallel
     Yields
     ======
-
-    The shape of each element of X is (color, height, width), where color is 1 or 3 or 4 and height/width
-    do not vary among images.
+    it yields each time X where X is matrix containing several images.
+    X has shape (nb_image, color, height, width). nb_image is `chunk_size` at most (it can be smaller)
     """
-    from skimage.io import imread  # TODO
+    from skimage.io import imread
     from joblib import delayed
     from joblib import Parallel
     for i in range(0, len(X_array), chunk_size):
@@ -265,10 +275,17 @@ def _chunk_iterator(X_array, folder, chunk_size=1024, n_jobs=8):
             for x in X_chunk]
         X = Parallel(n_jobs=n_jobs, backend='threading')(delayed(imread)(
             filename) for filename in filenames)
-        yield np.moveaxis(X, -1, 1)  # from (height, width, color) to (color, height, width)
+        # use np.moveaxis to "reshape" (nb_image, height, width, color) to shape (nb_image, color, height, width)
+        yield np.moveaxis(X, -1, 1)
 
 
 class KnownLengthGenerator:
+    """
+    This class allows to define a generator on which we can apply the len function.
+    For example if gen() is a generator, then KnownLengthGenerator(gen(), 10)
+    will generate the same objects as gen() and will have a lenght of 10.
+    """
+
     def __init__(self, gen, length):
         self.gen = gen
         self.length = int(length)
@@ -280,5 +297,4 @@ class KnownLengthGenerator:
         yield from self.gen
 
     def __next__(self):
-        print(f"Destruction of a generator !!")
         return next(self.gen)
