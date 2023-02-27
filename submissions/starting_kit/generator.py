@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class Generator():
+class Generator:
     """
     This a dummy generator that generates noise of size (3, 64, 64).
     """

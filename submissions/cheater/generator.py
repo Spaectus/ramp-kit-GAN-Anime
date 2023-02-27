@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class Generator():
+class Generator:
     """
     This a cheater generator that returns samples from the training dataset.
     """

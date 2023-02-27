@@ -1,19 +1,12 @@
-import torchvision
-import numpy as np
+import urllib.request
+import zipfile
+from pathlib import Path
 
+import numpy as np
 import torch
 from torch import nn
 from torch import optim
-from torch.utils.data import DataLoader, Dataset
-from torchvision.transforms import Compose, CenterCrop, Resize, ToTensor, Normalize
-import torchvision.utils as vutils
-import matplotlib.pyplot as plt
-from PIL import Image
 from tqdm import tqdm
-
-import urllib.request
-from pathlib import Path
-import zipfile
 
 seed = 0
 torch.manual_seed(seed)
@@ -102,7 +95,7 @@ class DiscriminatorGAN(nn.Module):
         return self.body(x)
 
 
-class Generator():
+class Generator:
     """
     This is a DCGAN, implemented by François.
     """
@@ -150,7 +143,7 @@ class Generator():
             self.generator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.optimizer_d = optim.Adam(
             self.discriminator.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        
+
         download_pretrained_weights()
 
     # def fit(self, image_folder: torchvision.datasets.ImageFolder):
