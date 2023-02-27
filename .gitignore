@@ -108,3 +108,4 @@ ENV/
 
 # Models created in the notebook
 models/
+example_models/
