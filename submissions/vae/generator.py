@@ -1,24 +1,14 @@
-import torchvision
 import numpy as np
 
 import torch
 from torch import nn
 from torch import optim
-from torch.utils.data import DataLoader, Dataset
-from torchvision.transforms import Compose, CenterCrop, Resize, ToTensor, Normalize
-import torchvision.utils as vutils
-import matplotlib.pyplot as plt
-from PIL import Image
 from tqdm import tqdm
-import os
 import torch.nn.functional as F
 
 import urllib.request
 from pathlib import Path
 import zipfile
-
-seed = 0
-torch.manual_seed(seed)
 
 def download_pretrained_weights():
     """This function downloads the weights of our pre-trained DCGAN over 50 epochs.
@@ -29,12 +19,11 @@ def download_pretrained_weights():
     DIR.mkdir(exist_ok=True)
 
     DIR_VAE = DIR / "vae_4980.pth"
-    # DIR_DEC = DIR / "decoder_19900.pth"
 
     if DIR_VAE.exists() :# and DIR_DEC.exists():
         return
     print("Did not find pretrained weights in the directory. Starting download.")
-    tmp_filename = "weights_50_epochs.zip"
+    tmp_filename = "vae_weights.zip"
 
     url = "https://drive.rezel.net/s/kPnS6qxNmratt9Z/download/vae_4980.zip"
 
@@ -45,69 +34,6 @@ def download_pretrained_weights():
     Path(tmp_filename).unlink()
     print("Finished downloading.")
 
-
-#@title Model and training parameters
-
-training_path = "./data/train_1/"
-
-batch_size = 128
-image_size = 64
-nb_channels = 3
-
-latent_dim = 256
-
-epochs = 20
-learning_rate = 1e-4
-KL_weight = 1e-4
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(device)
-
-
-#@title Dataset class and transforms
-training_transform = Compose([
-    Resize(image_size),
-    CenterCrop(image_size),
-    ToTensor(),
-    Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-])
-
-
-class ImageSet(Dataset):
-    def __init__(self, path, transform, preload=False):
-        self.path = path
-        self.files = os.listdir(self.path)
-        self.transform = transform
-        self.preload = preload
-        if self.preload:
-          self.files = [
-              self.transform(
-                  Image.open(os.path.join(self.path, file))
-              ) for file in self.files]
-
-    def __getitem__(self, index):
-        if self.preload:
-          return self.files[index]
-        else:
-          return self.transform(
-              Image.open(os.path.join(self.path, self.files[index]))
-          )
-    
-    def __len__(self):
-        return len(self.files)
-    
-#@title Datasets making
-training_set = ImageSet(
-    path=training_path,
-    transform=training_transform,
-    preload=True,
-)
-
-
-training_loader = DataLoader(
-    training_set,
-    batch_size=batch_size,
-    shuffle=True
-)
 
 class VAE(nn.Module):
 
@@ -225,8 +151,10 @@ class VAE(nn.Module):
 
 
 class Generator():
-    def __init__(self):
-        self.latent_space_dimension: int = 100
+    def __init__(self, latent_space_dimension):
+        seed = 0
+        torch.manual_seed(seed)
+        self.latent_space_dimension = 256
 
         self.batch_size = 128
         self.image_size = 64
@@ -236,9 +164,15 @@ class Generator():
         self.d_features = 64
         self.n_features = 64
 
-        self.epochs = 1
-        self.lr = 2e-4
+        self.epochs = 20
+        self.lr =12e-4
         self.beta1 = 0.5
+
+        self.batch_size = 128
+        self.image_size = 64
+        self.nb_channels = 3
+
+        self.KL_weight = 1e-4
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
@@ -246,7 +180,7 @@ class Generator():
         self.VAE = VAE(self.channels, self.n_features, self.latent_space_dimension)
         # Optimizers
         # self.criterion = vae_loss()
-        self.optimizer = optim.Adam(self.VAE.parameters(), lr=self.learning_rate)
+        self.optimizer = optim.Adam(self.VAE.parameters(), lr=self.lr)
         download_pretrained_weights()
 
     def fit(self,batchGeneratorBuilderNoValidNy):
@@ -261,25 +195,29 @@ class Generator():
         self.VAE.train()
 
 
-        for epoch in range(epochs):
+        for epoch in tqdm(np.arange(1, self.epochs + 1)):
+            generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(
+                batch_size=self.batch_size)
             total_loss = 0
-            for batch_idx, x in enumerate(training_loader):
+            for batch_idx, x in enumerate(generator_of_images):
+                # x is a numpy array of size (batch_size, 3, 64, 64).
                 # Move the input data to the same device as the model
-                x = x.to(device)
+                x = torch.Tensor(x).to(self.device)
 
                 self.optimizer.zero_grad()
                 x_hat, mu, log_var = self.VAE(x)
-                loss = vae_loss(x, x_hat, mu, log_var, KL_weight)
+                loss = vae_loss(x, x_hat, mu, log_var, self.KL_weight)
                 loss.backward()
                 self.optimizer.step()
                 total_loss += loss.item()
-            print(f"Epoch {epoch+1}, loss={total_loss / len(training_loader.dataset):.4f}")
+            # print(f"Epoch {epoch+1}, loss={total_loss / total_nb_images:.4f}")
 
-    def generate(self):
-        self.generator.eval()
+    def generate(self, latent_space_noise):
+        self.VAE.eval()
         with torch.no_grad():
-            random_noise = torch.randn(64, latent_dim, device=device)
-            batch = self.VAE.decode(random_noise)
+            truncated_noise = torch.Tensor(
+                latent_space_noise[:, :self.latent_space_dimension]).to(self.device)
+            batch = self.VAE.decode(truncated_noise)
 
         return batch.numpy(force=True)
 
@@ -287,8 +225,6 @@ class Generator():
 
 
  
-# Create an instance of the VAE model
-# model = VAE(nb_channels, image_size, latent_dim).to(device)
  
 def vae_loss(x, x_hat, mu, log_var, beta):
     # Reconstruction loss
@@ -305,6 +241,3 @@ def vae_loss(x, x_hat, mu, log_var, beta):
     loss = recon_loss + beta * kld_loss
     
     return loss
-
-
-

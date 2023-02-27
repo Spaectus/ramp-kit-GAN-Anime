@@ -22,7 +22,6 @@ class Generator:
         self.max_samples = 500
         self.rng = np.random.RandomState(seed=0)
 
-    # def fit(self, image_folder: torchvision.datasets.ImageFolder):
     def fit(self, batchGeneratorBuilderNoValidNy):
         """Trains the generator with a batch generator builder, which can return a Python Generator with its method `get_train_generators`.
 
