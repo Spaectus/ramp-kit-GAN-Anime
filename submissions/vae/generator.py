@@ -11,7 +11,7 @@ from pathlib import Path
 import zipfile
 
 def download_pretrained_weights():
-    """This function downloads the weights of our pre-trained DCGAN over 50 epochs.
+    """This function downloads the weights of our pre-trained VAE over 20 epochs.
 
     This submission fine-tunes our model that was already pre-trained on many images.
     """
@@ -34,9 +34,17 @@ def download_pretrained_weights():
     Path(tmp_filename).unlink()
     print("Finished downloading.")
 
-
+# Code adapted from :
+# https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
 class VAE(nn.Module):
+    """
+    This class implements a variational autoencoder using convolutional networks to encode the data
+    To initiate an object of this class, one must give : 
+        - The number of channels of the image (3 in the case of RGB images)
+        - The number of features of an image (the number of pixels of the side of an image, assuming it is a square image)
+        - The dimension of the latent space
 
+    """
     def __init__(self, nb_channels, n_features, latent_dim):
         super(VAE, self).__init__()
 
@@ -141,6 +149,11 @@ class VAE(nn.Module):
         return eps * std + mu
 
     def forward(self, input, **kwargs):
+        """
+        This method encodes the input, computes its corresponding mean and variance, and reconstruct the image 
+        from a sample drawn from a normal distribution whose parameters are the mean and variance computed in the 
+        encoding step.
+        """
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         x_hat = self.decode(z)
@@ -150,6 +163,16 @@ class VAE(nn.Module):
 
 class Generator():
     def __init__(self, latent_space_dimension):
+        """
+        Initializes a Generator object that is used for `ramp` training and evaluation.
+        This generator uses our pretrained VAE. 
+
+        This object is used to wrap your generator model and anything else required to train it and
+        to generate samples.
+
+        Args:
+            latent_space_dimension (int): Dimension of the latent space, where inputs of the generator are sampled.
+        """
         seed = 0
         torch.manual_seed(seed)
         self.latent_space_dimension = 256
@@ -188,7 +211,13 @@ class Generator():
         download_pretrained_weights()
 
     def fit(self,batchGeneratorBuilderNoValidNy):
+        """Trains the generator with a batch generator builder, which can return a Python Generator with its method `get_train_generators`.
 
+        In this submission, this method fine-tunes the pre-trained VAE
+
+        Args:
+            batchGeneratorBuilderNoValidNy (_type_): _description_
+        """
         pretrained = True
         if pretrained:
             PATH = Path(__file__).parent / "models"
@@ -220,7 +249,17 @@ class Generator():
             # print(f"Epoch {epoch+1}, loss={total_loss / total_nb_images:.4f}")
         self.VAE.eval()
         self.latent_std = torch.sqrt(self.latent_moment2 - self.latent_moment1.pow(2))
+    
     def generate(self, latent_space_noise):
+        """
+        Generates a minibatch of `nb_image` colored (3 channels : RGB) images of size 64 x 64 from a matrix in the latent space.
+
+        Args:
+            latent_space_noise (ndarray, shape (nb_image, 1024)): a mini-batch of noise of dimension  issued from a normal (Gaussian) distribution
+
+        Returns:
+            ndarray, shape (nb_image, 3, 64, 64): A mini-batch of `nb_image` colored (3 channels : RGB) images of size 64 x 64 from a matrix in the latent space.
+        """
         self.VAE.eval()
         with torch.no_grad():
             truncated_noise = latent_space_noise[:, :self.latent_space_dimension]
@@ -236,6 +275,14 @@ class Generator():
  
  
 def vae_loss(x, x_hat, mu, log_var, beta):
+    """
+    The loss used during the training of the VAE.
+    It has two components: 
+        -recon_loss : Reconstruction loss, which measures the difference between the reconstructed image from the original one
+        -kld_loss: Latent loss, which penalize the network when the approximate distribution of the latent space 
+        computed by the encoder gets different than the standard gaussian distribution. This loss will allow us to generate new images 
+        from noise generated from a standard gaussian distribution. 
+    """
     recon_loss = F.mse_loss(x, x_hat)
     kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
     loss = recon_loss + beta * kld_loss
