@@ -37,7 +37,6 @@ def download_pretrained_weights():
 
 class VAE(nn.Module):
 
-
     def __init__(self, nb_channels, n_features, latent_dim):
         super(VAE, self).__init__()
 
@@ -145,13 +144,12 @@ class VAE(nn.Module):
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
         x_hat = self.decode(z)
-        return  x_hat, mu, log_var
-    
+        return  x_hat, mu, log_var, z
 
 
 
 class Generator():
-    def __init__(self):
+    def __init__(self, latent_space_dimension):
         seed = 0
         torch.manual_seed(seed)
         self.latent_space_dimension = 256
@@ -181,42 +179,54 @@ class Generator():
         # Optimizers
         # self.criterion = vae_loss()
         self.optimizer = optim.Adam(self.VAE.parameters(), lr=self.lr)
+
+        self.latent_moment1 = torch.zeros(self.latent_space_dimension).to(self.device)
+        self.latent_moment2 = torch.zeros(self.latent_space_dimension).to(self.device)
+        # variance = E[X²] - E[X]²
+        self.latent_std = None
+
         download_pretrained_weights()
 
     def fit(self,batchGeneratorBuilderNoValidNy):
 
-
-        PATH = Path(__file__).parent / "models"
-        self.VAE.load_state_dict(
-            torch.load(PATH / "vae_4980.pth"))
+        pretrained = True
+        if pretrained:
+            PATH = Path(__file__).parent / "models"
+            self.VAE.load_state_dict(
+                torch.load(PATH / "vae_4980.pth"))
 
         self.VAE.to(self.device)
 
         self.VAE.train()
-
 
         for epoch in tqdm(np.arange(1, self.epochs + 1)):
             generator_of_images, total_nb_images = batchGeneratorBuilderNoValidNy.get_train_generators(
                 batch_size=self.batch_size)
             total_loss = 0
             for batch_idx, x in enumerate(generator_of_images):
-                # x is a numpy array of size (batch_size, 3, 64, 64).
+                # x is a numpy array of size (batch_size, 3, 64, 64), not normalized.
                 # Move the input data to the same device as the model
-                x = torch.Tensor(x).to(self.device)
+
+                x = torch.Tensor(x/255).to(self.device)
 
                 self.optimizer.zero_grad()
-                x_hat, mu, log_var = self.VAE(x)
+                x_hat, mu, log_var, z = self.VAE(x)
+                self.latent_moment1 += z.sum(dim=0)/total_nb_images
+                self.latent_moment2 += z.pow(2).sum(dim=0)/total_nb_images
                 loss = vae_loss(x, x_hat, mu, log_var, self.KL_weight)
                 loss.backward()
                 self.optimizer.step()
                 total_loss += loss.item()
             # print(f"Epoch {epoch+1}, loss={total_loss / total_nb_images:.4f}")
-
+        self.VAE.eval()
+        self.latent_std = torch.sqrt(self.latent_moment2 - self.latent_moment1.pow(2))
     def generate(self, latent_space_noise):
         self.VAE.eval()
         with torch.no_grad():
-            random_noise = torch.randn(latent_space_noise, self.latent_space_dimension, device=self.device)
-            batch = self.VAE.decode(random_noise)
+            truncated_noise = latent_space_noise[:, :self.latent_space_dimension]
+            truncated_noise = torch.Tensor(truncated_noise).to(self.device) * self.latent_std + self.latent_moment1
+            batch = self.VAE.decode(truncated_noise)
+            # print(batch)
 
         return batch.numpy(force=True)
 
