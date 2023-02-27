@@ -227,17 +227,8 @@ class Generator():
  
  
 def vae_loss(x, x_hat, mu, log_var, beta):
-    # Reconstruction loss
-    #pdb.set_trace()
-    #recon_loss = nn.BCELoss(reduction='mean')(x_hat, x)
     recon_loss = F.mse_loss(x, x_hat)
-
-    #recon_loss = (x * torch.log(x_hat) + (1 - x)* torch.log(1 - x_hat)).sum((1, 2, 3)).mean()
-    #pdb.set_trace()
-    # KL divergence loss
     kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-    #pdb.set_trace()
-    # Total loss
     loss = recon_loss + beta * kld_loss
     
     return loss
