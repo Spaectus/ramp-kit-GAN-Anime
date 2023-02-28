@@ -1,4 +1,4 @@
-# RAMP starting kit on GAN Anime
+# RAMP starting kit on Anime faces
 
 
 > Authors: MAI Huu Tan, CARON Marceau, SALOMON Yohann, LIU Annie, BERTHOLOM François & BIGOT Alexandre
