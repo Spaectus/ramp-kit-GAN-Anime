@@ -49,4 +49,5 @@ We then choose `b=-2`
 
 ### References
 
--VAE architecture is adapted from:  https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
+*[VAE](https://arxiv.org/abs/1312.6114) architecture is adapted from [AntixK's implementation](https://github.com/AntixK/PyTorch-VAE/).
+*[DCGAN](https://arxiv.org/abs/1511.06434) code is adapted from a [PyTorch tutorial](https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html).
