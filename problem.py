@@ -5,7 +5,6 @@ import torch
 
 import numpy as np
 
-from prediction_types.generative import make_generative_img
 from workflows.image_generative import ImageGenerative
 
 from prediction_types.generative import make_generative_img
@@ -16,7 +15,6 @@ problem_title = "Anime faces"
 width = 64
 height = 64
 channels = 3
-p = channels * height * width
 
 # -----------------------------------------------------------------------------
 # Worklow element
@@ -66,8 +64,8 @@ def get_cv(X, y):
     StratifiedShuffleSplit() from scikit-learn, it is important to set the random seed. This ensures that the train and
     validation data will be the same for all participants.
 
-    :param X:
-    :param y:
+    :param X: tuple of paths
+    :param y: tuple of paths
     :return:
     """
     assert isinstance(X, tuple)
