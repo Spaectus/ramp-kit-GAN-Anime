@@ -95,7 +95,7 @@ class ImageGenerative():
         assert len(folders) == 1, f"They are not exactly one folder ({len(folders)}) {folders=}"
         folder = tuple(folders)[0]
 
-        images_names = [str(path.absolute()) for path in selected_images]
+        images_names = [path.name for path in selected_images]
 
         g = BatchGeneratorBuilderNoValidNy(images_names, f"data/{folder}", chunk_size=self.chunk_size_feeder,
                                            n_jobs=self.n_jobs_batch_generator)
