@@ -30,7 +30,9 @@ ramp-test --quick-test
 #### Help
 Go to the `ramp-workflow` [wiki](https://github.com/paris-saclay-cds/ramp-workflow/wiki) for more help on the [RAMP](https://ramp.studio) ecosystem.
 
+### References
 
+-VAE architecture is adapted from:  https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
 ---
 
 ### Mixed Score :
