@@ -34,8 +34,7 @@ def download_pretrained_weights():
     Path(tmp_filename).unlink()
     print("Finished downloading.")
 
-# Code adapted from :
-# https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
+
 class VAE(nn.Module):
     """
     This class implements a variational autoencoder using convolutional networks to encode the data
